@@ -1,0 +1,89 @@
+version: "3"
+
+tasks:
+  oci:login:
+    desc: "Authenticate OCI session"
+    cmds:
+      - oci session authenticate
+
+  oci-platform:generate-keys:
+    desc: "Step 0. Generate key pair for ExternalDNS"
+    cmds:
+      - echo "Generating key pair for ExternalDNS"
+      - rm -rf ./.keys
+      - mkdir ./.keys
+      - openssl genrsa -out .keys/oci_api_key.pem 2048
+      - openssl rsa -pubout -in .keys/oci_api_key.pem -out .keys/oci_api_key_public.pem
+      - openssl rsa -pubout -outform DER -in .keys/oci_api_key.pem | openssl md5 -c | sed 's/^.*= //' > .keys/fingerprint.txt
+      - echo "Keys generated in .keys/ directory"
+
+  oci-platform:install-network:
+    desc: "Step 1. Install network layer"
+    dir: 01-network
+    cmds:
+      - echo "Installing network layer..."
+      - tofu init
+      - tofu apply
+
+  oci-platform:install-identity:
+    desc: "Step 2. Install identity layer"
+    dir: 02-identity
+    cmds:
+      - echo "Installing identity layer..."
+      - tofu init
+      - tofu apply
+
+  oci-platform:install-oke:
+    desc: "Step 3. Install OKE cluster"
+    dir: 03-oke
+    cmds:
+      - echo "Installing OKE..."
+      - tofu init
+      - tofu apply
+
+  oci-platform:install-dns:
+    desc: "Step 4. Install DNS"
+    dir: 04-dns
+    cmds:
+      - echo "Installing DNS..."
+      - |
+        PUBLIC_KEY=$(cat ../.keys/oci_api_key_public.pem)
+        tofu init
+        tofu apply -var="external_dns_public_key=$PUBLIC_KEY"
+
+  oci-platform:install-vpn:
+    desc: "Step 5. Install VPN"
+    dir: 05-vpn
+    cmds:
+      - echo "Installing VPN..."
+      - tofu init
+      - tofu apply
+
+  oci-platform:install-cert-manager:
+    desc: "Step 6. Install cert-manager"
+    dir: 06-cert-manager
+    cmds:
+      - echo "Installing cert-manager..."
+      - tofu init
+      - tofu apply
+
+  oci-platform:install-nginx-gateway:
+    desc: "Step 7. Install NGINX Gateway"
+    dir: 07-nginx-gateway
+    cmds:
+      - echo "Installing NGINX Gateway..."
+      - tofu init
+      - tofu apply
+
+  oci-platform:install-external-dns:
+    desc: "Step 8. Install ExternalDNS"
+    dir: 08-external-dns
+    cmds:
+      - echo "Installing ExternalDNS..."
+      - |
+        PRIVATE_KEY=$(cat ../.keys/oci_api_key.pem)
+        FINGERPRINT=$(cat ../.keys/fingerprint.txt)
+        tofu init
+        tofu apply \
+          -var="external_dns_private_key=$PRIVATE_KEY" \
+          -var="external_dns_private_key_fingerprint=$FINGERPRINT"

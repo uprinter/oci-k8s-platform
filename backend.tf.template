@@ -1,0 +1,119 @@
+# Local Backend (default)
+terraform {
+  backend "local" {
+    path = "terraform.tfstate"
+  }
+}
+
+# Remote Backend
+terraform {
+  backend "remote" {
+    hostname     = "app.terraform.io"
+    organization = "my-org"
+    
+    workspaces {
+      name = "my-workspace"
+    }
+  }
+}
+
+# S3 Backend
+terraform {
+  backend "s3" {
+    bucket         = "my-terraform-state"
+    key            = "path/to/my/key"
+    region         = "us-west-2"
+    encrypt        = true
+    dynamodb_table = "terraform-state-lock"
+  }
+}
+
+# Azure RM Backend
+terraform {
+  backend "azurerm" {
+    resource_group_name  = "StorageAccount-ResourceGroup"
+    storage_account_name = "abcd1234"
+    container_name       = "tfstate"
+    key                  = "prod.terraform.tfstate"
+  }
+}
+
+# GCS Backend
+terraform {
+  backend "gcs" {
+    bucket = "tf-state-prod"
+    prefix = "terraform/state"
+  }
+}
+
+# Consul Backend
+terraform {
+  backend "consul" {
+    address = "consul.example.com:8500"
+    scheme  = "https"
+    path    = "full/path"
+  }
+}
+
+# etcd Backend
+terraform {
+  backend "etcd" {
+    endpoints = ["http://one:2379", "http://two:2379"]
+    path      = "/path/to/terraform.tfstate"
+  }
+}
+
+# etcdv3 Backend
+terraform {
+  backend "etcdv3" {
+    endpoints = ["etcd-1:2379", "etcd-2:2379", "etcd-3:2379"]
+    lock      = true
+  }
+}
+
+# HTTP Backend
+terraform {
+  backend "http" {
+    address        = "http://myrest.api.com/foo"
+    lock_address   = "http://myrest.api.com/foo"
+    unlock_address = "http://myrest.api.com/foo"
+  }
+}
+
+# Kubernetes Backend
+terraform {
+  backend "kubernetes" {
+    secret_suffix    = "state"
+    config_path      = "~/.kube/config"
+    config_context   = "my-context"
+    namespace        = "terraform"
+  }
+}
+
+# OSS Backend (Alibaba Cloud)
+terraform {
+  backend "oss" {
+    bucket              = "bucket-for-terraform-state"
+    prefix              = "path/mystate"
+    key                 = "version-1.tfstate"
+    region              = "cn-beijing"
+    tablestore_endpoint = "https://terraform-remote.cn-hangzhou.ots.aliyuncs.com"
+    tablestore_table    = "statelock"
+  }
+}
+
+# PostgreSQL Backend
+terraform {
+  backend "pg" {
+    conn_str = "postgres://user:pass@db.example.com/terraform_backend?sslmode=require"
+  }
+}
+
+# COS Backend (Tencent Cloud)
+terraform {
+  backend "cos" {
+    region = "ap-guangzhou"
+    bucket = "terraform-state-1234567890"
+    prefix = "terraform/state"
+  }
+}
