@@ -8,20 +8,20 @@ variable "region" {
   type        = string
 }
 
-variable "internal_hosted_zone_name" {
+variable "internal_zone_name" {
   description = "Internal DNS zone name"
   type        = string
-}
+}     
 
-variable "external_hosted_zone_name" {
+variable "external_zone_name" {
   description = "External DNS zone name"
   type        = string
 }
 
-variable "scope" {
-  description = "DNS zone scope (PRIVATE or GLOBAL)"
-  type        = string
-  default     = "PRIVATE"
+variable "public_zone_names" {
+  description = "Public DNS zone names"
+  type        = list(string)
+  default     = []
 }
 
 variable "external_dns_public_key" {

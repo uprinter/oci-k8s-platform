@@ -25,10 +25,11 @@ provider "kubernetes" {
 }
 
 module "nginx-gateway" {
-  source            = "../modules/nginx-gateway"
-  lb_sg_id          = var.lb_nsg_id
-  issuer_name       = var.issuer_name
-  issuer_kind       = var.issuer_kind
-  internal_dns_zone = var.internal_hosted_zone_name
-  external_dns_zone = var.external_hosted_zone_name
+  source                  = "../modules/nginx-gateway"
+  lb_sg_id                = var.lb_nsg_id
+  issuer_name             = var.issuer_name
+  issuer_kind             = var.issuer_kind
+  internal_dns_zone       = var.internal_hosted_zone_name
+  external_dns_zone       = var.external_hosted_zone_name
+  public_dns_zone_records = var.public_hosted_zone_records
 }

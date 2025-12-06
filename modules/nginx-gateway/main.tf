@@ -24,6 +24,11 @@ variable "external_dns_zone" {
   type        = string
 }
 
+variable "public_dns_zone_records" {
+  description = "The public DNS zone records for the external gateway"
+  type        = list(string)
+}
+
 variable "lb_sg_id" {
   description = "The OCID of the network security group for the load balancer"
   type        = string
@@ -50,7 +55,7 @@ resource "kubernetes_manifest" "nginx_fabric_gateway_external" {
       gatewayClassName = "nginx"
       infrastructure = {
         annotations = {
-          "external-dns.alpha.kubernetes.io/hostname"                   = "*.${var.external_dns_zone}"
+          "external-dns.alpha.kubernetes.io/hostname"                   = "*.${var.external_dns_zone}${length(var.public_dns_zone_records) > 0 ? format(",%s", join(",", var.public_dns_zone_records)) : ""}"
           "service.beta.kubernetes.io/oci-load-balancer-shape"          = "flexible"
           "service.beta.kubernetes.io/oci-load-balancer-shape-flex-min" = "10"
           "service.beta.kubernetes.io/oci-load-balancer-shape-flex-max" = "50"
