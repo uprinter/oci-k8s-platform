@@ -13,6 +13,12 @@ variable "external_hosted_zone_name" {
   type        = string
 }
 
+variable "public_hosted_zone_records" {
+  description = "Public DNS zone records"
+  type        = list(string)
+  default     = []
+}
+
 variable "lb_nsg_id" {
   description = "Load balancer NSG ID"
   type        = string
