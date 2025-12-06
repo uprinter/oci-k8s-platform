@@ -18,9 +18,9 @@ module "dns" {
   source                      = "../modules/dns"
   vcn_id                      = var.vcn_id
   compartment_id              = var.root_compartment_id
-  internal_dns_zone           = var.internal_hosted_zone_name
-  external_dns_zone           = var.external_hosted_zone_name
-  scope                       = var.scope
+  internal_dns_zone           = var.internal_zone_name
+  external_dns_zone           = var.external_zone_name
+  public_dns_zones            = var.public_zone_names
   external_dns_public_key     = var.external_dns_public_key
   technical_users_domain_url  = var.technical_users_domain_url
   technical_users_domain_name = var.technical_users_domain_name
