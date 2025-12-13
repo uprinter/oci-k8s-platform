@@ -13,14 +13,14 @@ variable "k8s_context" {
   type        = string
 }
 
-variable "external_dns_private_key" {
-  description = "Private key for external DNS user"
+variable "oci_api_private_key" {
+  description = "Private key for OCI API"
   type        = string
   sensitive   = true
 }
 
-variable "external_dns_private_key_fingerprint" {
-  description = "Fingerprint of the external DNS private key"
+variable "oci_api_private_key_fingerprint" {
+  description = "Fingerprint of the private key for OCI API"
   type        = string
 }
 

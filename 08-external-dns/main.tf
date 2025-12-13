@@ -29,6 +29,6 @@ module "external-dns" {
   region          = var.region
   tenancy_ocid    = var.root_compartment_id
   user_ocid       = var.external_dns_user_ocid
-  private_key_pem = var.external_dns_private_key
-  fingerprint     = var.external_dns_private_key_fingerprint
+  private_key_pem = var.oci_api_private_key
+  fingerprint     = var.oci_api_private_key_fingerprint
 }

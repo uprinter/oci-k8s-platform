@@ -18,7 +18,7 @@ module "identity" {
   source                      = "../modules/identity"
   compartment_id              = var.root_compartment_id
   region                      = var.region
-  external_dns_public_key     = var.external_dns_public_key
+  oci_api_public_key          = var.oci_api_public_key
   technical_users_domain_url  = var.technical_users_domain_url
   technical_users_domain_name = var.technical_users_domain_name
 }

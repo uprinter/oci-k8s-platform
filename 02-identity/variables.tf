@@ -8,8 +8,8 @@ variable "region" {
   type        = string
 }
 
-variable "external_dns_public_key" {
-  description = "Public key for external DNS user"
+variable "oci_api_public_key" {
+  description = "Public key for OCI API"
   type        = string
 }
 
