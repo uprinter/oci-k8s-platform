@@ -21,13 +21,4 @@ module "dns" {
   internal_dns_zone           = var.internal_zone_name
   external_dns_zone           = var.external_zone_name
   public_dns_zones            = var.public_zone_names
-  external_dns_public_key     = var.external_dns_public_key
-  technical_users_domain_url  = var.technical_users_domain_url
-  technical_users_domain_name = var.technical_users_domain_name
-}
-
-output "external_dns_user_ocid" {
-  value       = module.dns.external_dns_user_ocid
-  description = "OCID of the external DNS user"
-  sensitive   = true
 }

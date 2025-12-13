@@ -15,9 +15,12 @@ provider "oci" {
 }
 
 module "identity" {
-  source         = "../modules/identity"
-  compartment_id = var.root_compartment_id
-  region         = var.region
+  source                      = "../modules/identity"
+  compartment_id              = var.root_compartment_id
+  region                      = var.region
+  external_dns_public_key     = var.external_dns_public_key
+  technical_users_domain_url  = var.technical_users_domain_url
+  technical_users_domain_name = var.technical_users_domain_name
 }
 
 output "technical_users_domain_url" {
@@ -28,4 +31,10 @@ output "technical_users_domain_url" {
 output "technical_users_domain_name" {
   value       = module.identity.technical_users_domain_name
   description = "Technical users domain name"
+}
+
+output "external_dns_user_ocid" {
+  value       = module.identity.external_dns_user_ocid
+  description = "OCID of the external DNS user"
+  sensitive   = true
 }
