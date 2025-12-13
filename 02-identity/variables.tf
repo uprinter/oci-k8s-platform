@@ -7,3 +7,18 @@ variable "region" {
   description = "The OCI region to deploy resources in"
   type        = string
 }
+
+variable "external_dns_public_key" {
+  description = "Public key for external DNS user"
+  type        = string
+}
+
+variable "technical_users_domain_url" {
+  description = "Technical users domain URL"
+  type        = string
+}
+
+variable "technical_users_domain_name" {
+  description = "Technical users domain name"
+  type        = string
+}

@@ -30,8 +30,10 @@ tasks:
     dir: 02-identity
     cmds:
       - echo "Installing identity layer..."
-      - tofu init
-      - tofu apply
+      - |
+        PUBLIC_KEY=$(cat ../.keys/oci_api_key_public.pem)
+        tofu init
+        tofu apply -var="external_dns_public_key=$PUBLIC_KEY"
 
   oci-platform:install-oke:
     desc: "Step 3. Install OKE cluster"
@@ -47,9 +49,8 @@ tasks:
     cmds:
       - echo "Installing DNS..."
       - |
-        PUBLIC_KEY=$(cat ../.keys/oci_api_key_public.pem)
         tofu init
-        tofu apply -var="external_dns_public_key=$PUBLIC_KEY"
+        tofu apply
 
   oci-platform:install-vpn:
     desc: "Step 5. Install VPN"
