@@ -75,3 +75,25 @@ resource "oci_containerengine_node_pool" "node_pool" {
     source_type = "IMAGE"
   }
 }
+
+resource "oci_kms_vault" "oke_secrets_vault" {
+  compartment_id = var.compartment_id
+  display_name   = "oke-secrets-vault"
+  vault_type     = "DEFAULT"
+}
+
+resource "oci_kms_key" "default_oke_secrets_vault_encryption_key" {
+  compartment_id      = var.compartment_id
+  display_name        = "default-oke-secrets-vault-encryption-key"
+  management_endpoint = oci_kms_vault.oke_secrets_vault.management_endpoint
+  protection_mode     = "SOFTWARE"
+
+  key_shape {
+    algorithm = "AES"
+    length    = 16
+  }
+}
+
+output "oke_external_secrets_vault_ocid" {
+  value = oci_kms_vault.oke_secrets_vault.id
+}

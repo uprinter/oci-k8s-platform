@@ -41,3 +41,8 @@ module "oke" {
   node_image_id         = var.node_image_id
   availability_domain   = data.oci_identity_availability_domains.availability_domains.availability_domains[0].name
 }
+
+output "oke_external_secrets_vault_ocid" {
+  value       = module.oke.oke_external_secrets_vault_ocid
+  description = "OCID of the OCI KMS Vault for external secrets"
+}

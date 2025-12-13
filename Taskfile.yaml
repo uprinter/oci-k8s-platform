@@ -88,3 +88,19 @@ tasks:
         tofu apply \
           -var="oci_api_private_key=$PRIVATE_KEY" \
           -var="oci_api_private_key_fingerprint=$FINGERPRINT"
+
+  oci-platform:install-external-secrets:
+    desc: "Step 9. Install ExternalSecrets"
+    dir: 09-external-secrets
+    cmds:
+      - echo "Installing ExternalSecrets..."
+      - |
+        PRIVATE_KEY=$(cat ../.keys/oci_api_key.pem)
+        FINGERPRINT=$(cat ../.keys/fingerprint.txt)
+        tofu init
+        tofu apply -exclude="module.external-secrets.kubernetes_manifest.oci_secret_store" \
+          -var="oci_api_private_key=$PRIVATE_KEY" \
+          -var="oci_api_private_key_fingerprint=$FINGERPRINT"
+        tofu apply \
+          -var="oci_api_private_key=$PRIVATE_KEY" \
+          -var="oci_api_private_key_fingerprint=$FINGERPRINT"

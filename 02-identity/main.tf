@@ -38,3 +38,9 @@ output "external_dns_user_ocid" {
   description = "OCID of the external DNS user"
   sensitive   = true
 }
+
+output "external_secrets_user_ocid" {
+  value       = module.identity.external_secrets_user_ocid
+  description = "OCID of the external secrets user"
+  sensitive   = true
+}
