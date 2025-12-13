@@ -33,7 +33,7 @@ tasks:
       - |
         PUBLIC_KEY=$(cat ../.keys/oci_api_key_public.pem)
         tofu init
-        tofu apply -var="external_dns_public_key=$PUBLIC_KEY"
+        tofu apply -var="oci_api_public_key=$PUBLIC_KEY"
 
   oci-platform:install-oke:
     desc: "Step 3. Install OKE cluster"
@@ -86,5 +86,5 @@ tasks:
         FINGERPRINT=$(cat ../.keys/fingerprint.txt)
         tofu init
         tofu apply \
-          -var="external_dns_private_key=$PRIVATE_KEY" \
-          -var="external_dns_private_key_fingerprint=$FINGERPRINT"
+          -var="oci_api_private_key=$PRIVATE_KEY" \
+          -var="oci_api_private_key_fingerprint=$FINGERPRINT"
