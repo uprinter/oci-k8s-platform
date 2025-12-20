@@ -89,3 +89,60 @@ resource "oci_identity_policy" "external_dns_policy" {
 output "external_dns_user_ocid" {
   value = oci_identity_domains_user.external_dns_user.ocid
 }
+
+resource "oci_identity_domains_api_key" "external_secrets_api_key" {
+  idcs_endpoint = var.technical_users_domain_url
+  key           = var.oci_api_public_key
+  schemas       = ["urn:ietf:params:scim:schemas:oracle:idcs:apikey"]
+
+  user {
+    ocid  = oci_identity_domains_user.external_secrets_user.ocid
+    value = oci_identity_domains_user.external_secrets_user.id
+  }
+}
+
+resource "oci_identity_domains_user" "external_secrets_user" {
+  idcs_endpoint = var.technical_users_domain_url
+  schemas = [
+    "urn:ietf:params:scim:schemas:core:2.0:User",
+    "urn:ietf:params:scim:schemas:oracle:idcs:extension:userState:User",
+    "urn:ietf:params:scim:schemas:oracle:idcs:extension:OCITags",
+    "urn:ietf:params:scim:schemas:oracle:idcs:extension:capabilities:User",
+    "urn:ietf:params:scim:schemas:oracle:idcs:extension:user:User"
+  ]
+  user_name = "external-secrets"
+  name {
+    family_name = "ExternalSecrets"
+  }
+}
+
+resource "oci_identity_domains_group" "external_secrets_group" {
+  display_name   = "ExternalSecrets Users"
+  idcs_endpoint  = var.technical_users_domain_url
+  attribute_sets = ["all"]
+  schemas = [
+    "urn:ietf:params:scim:schemas:core:2.0:Group",
+    "urn:ietf:params:scim:schemas:oracle:idcs:extension:OCITags",
+    "urn:ietf:params:scim:schemas:oracle:idcs:extension:group:Group",
+  ]
+
+  members {
+    value = oci_identity_domains_user.external_secrets_user.id
+    type  = "User"
+  }
+}
+
+resource "oci_identity_policy" "external_secrets_policy" {
+  compartment_id = var.compartment_id
+  name           = "external-secrets-policy"
+  description    = "Policy for ExternalSecrets"
+  statements = [
+    "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.external_secrets_group.display_name}' to use vaults in compartment id ${var.compartment_id}",
+    "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.external_secrets_group.display_name}' to manage keys in compartment id ${var.compartment_id}",
+    "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.external_secrets_group.display_name}' to manage secret-family in compartment id ${var.compartment_id}"
+  ]
+}
+
+output "external_secrets_user_ocid" {
+  value = oci_identity_domains_user.external_secrets_user.ocid
+}
