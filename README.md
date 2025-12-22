@@ -131,3 +131,15 @@ task oci-platform:install-nginx-gateway
 ```bash
 task oci-platform:install-external-dns
 ```
+
+#### Step 6.4. Deploy External Secrets
+
+```bash
+task oci-platform:install-external-secrets
+```
+
+#### Step 6.5. Deploy GitLab Agent
+
+```bash
+task oci-platform:install-gitlab-agent
+```
