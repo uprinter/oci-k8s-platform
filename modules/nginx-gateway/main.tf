@@ -47,18 +47,15 @@ resource "helm_release" "nginx_fabric_gateway" {
   create_namespace = true
 }
 
-# Local values for dynamic listener generation
 locals {
-  # Create a list of all DNS zones (external + public records)
   all_dns_zones = concat([var.external_dns_zone], var.public_dns_zone_records)
   
-  # Generate HTTPS listeners for each DNS zone
   https_listeners = [
     for idx, zone in local.all_dns_zones : {
       name     = "https-${idx + 1}"
       port     = 443
       protocol = "HTTPS"
-      hostname = idx == 0 ? "*.${zone}" : zone  # Wildcard for external_dns_zone, exact match for public records
+      hostname = idx == 0 ? "*.${zone}" : zone
       allowedRoutes = {
         namespaces = {
           from = "All"
@@ -76,7 +73,6 @@ locals {
     }
   ]
   
-  # Generate HTTP listeners for public DNS zone records (for ACME challenge)
   http_listeners = [
     for idx, zone in var.public_dns_zone_records : {
       name     = "http-${idx + 1}"
