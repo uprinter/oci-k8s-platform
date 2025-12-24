@@ -97,7 +97,7 @@ resource "kubernetes_manifest" "nginx_fabric_gateway_external" {
       name      = "nginx-fabric-gateway-external"
       namespace = helm_release.nginx_fabric_gateway.metadata.namespace
       annotations = {
-        "cert-manager.io/cluster-issuer" = "letsencrypt-staging-issuer"
+        "cert-manager.io/cluster-issuer" = "letsencrypt-issuer"
       }
     }
     spec = {
@@ -220,39 +220,6 @@ resource "kubernetes_manifest" "external_certificate" {
       issuerRef = {
         name = var.issuer_name
         kind = var.issuer_kind
-      }
-    }
-  }
-}
-
-resource "kubernetes_manifest" "letsencrypt_staging_issuer" {
-  manifest = {
-    apiVersion = "cert-manager.io/v1"
-    kind       = "ClusterIssuer"
-    metadata = {
-      name = "letsencrypt-staging-issuer"
-    }
-    spec = {
-      acme = {
-        server  = "https://acme-staging-v02.api.letsencrypt.org/directory"
-        email   = var.acme_registration_email
-        profile = "tlsserver"
-        privateKeySecretRef = {
-          name = "letsencrypt-staging"
-        }
-        solvers = [
-          {
-            http01 = {
-              gatewayHTTPRoute = {
-                parentRefs = [
-                  {
-                    name = kubernetes_manifest.nginx_fabric_gateway_external.manifest.metadata.name
-                  }
-                ]
-              }
-            }
-          }
-        ]
       }
     }
   }
