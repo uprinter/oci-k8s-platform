@@ -33,3 +33,8 @@ variable "issuer_kind" {
   description = "Certificate issuer kind"
   type        = string
 }
+
+variable "acme_registration_email" {
+  description = "Email address used for ACME registration"
+  type        = string
+}

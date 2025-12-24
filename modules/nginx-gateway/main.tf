@@ -29,6 +29,11 @@ variable "public_dns_zone_records" {
   type        = list(string)
 }
 
+variable "acme_registration_email" {
+  description = "The email address for ACME registration"
+  type        = string
+}
+
 variable "lb_sg_id" {
   description = "The OCID of the network security group for the load balancer"
   type        = string
@@ -50,6 +55,9 @@ resource "kubernetes_manifest" "nginx_fabric_gateway_external" {
     metadata = {
       name      = "nginx-fabric-gateway-external"
       namespace = helm_release.nginx_fabric_gateway.metadata.namespace
+      annotations = {
+        "cert-manager.io/cluster-issuer" = "letsencrypt-staging-issuer"
+      }
     }
     spec = {
       gatewayClassName = "nginx"
@@ -64,7 +72,10 @@ resource "kubernetes_manifest" "nginx_fabric_gateway_external" {
       }
       listeners = [
         {
-          name     = "https"
+          name     = "https-1"
+          port     = 443
+          protocol = "HTTPS"
+          hostname = "*.${var.external_dns_zone}"
           port     = 443
           protocol = "HTTPS"
           allowedRoutes = {
@@ -80,6 +91,37 @@ resource "kubernetes_manifest" "nginx_fabric_gateway_external" {
                 name = kubernetes_manifest.external_certificate.manifest.metadata.name
               }
             ]
+          }
+        },
+        {
+          name     = "https-3"
+          hostname = "2pm.ninja"
+          port     = 443
+          protocol = "HTTPS"
+          allowedRoutes = {
+            namespaces = {
+              from = "All"
+            }
+          }
+          tls = {
+            mode = "Terminate"
+            certificateRefs = [
+              {
+                kind = "Secret"
+                name = "2pm-ninja-cert"
+              }
+            ]
+          }
+        },
+        {
+          name     = "http-2"
+          hostname = "2pm.ninja"
+          port     = 80
+          protocol = "HTTP"
+          allowedRoutes = {
+            namespaces = {
+              from = "All"
+            }
           }
         }
       ]
@@ -191,6 +233,72 @@ resource "kubernetes_manifest" "external_certificate" {
       issuerRef = {
         name = var.issuer_name
         kind = var.issuer_kind
+      }
+    }
+  }
+}
+
+resource "kubernetes_manifest" "letsencrypt_staging_issuer" {
+  manifest = {
+    apiVersion = "cert-manager.io/v1"
+    kind       = "ClusterIssuer"
+    metadata = {
+      name = "letsencrypt-staging-issuer"
+    }
+    spec = {
+      acme = {
+        server  = "https://acme-staging-v02.api.letsencrypt.org/directory"
+        email   = var.acme_registration_email
+        profile = "tlsserver"
+        privateKeySecretRef = {
+          name = "letsencrypt-staging"
+        }
+        solvers = [
+          {
+            http01 = {
+              gatewayHTTPRoute = {
+                parentRefs = [
+                  {
+                    name = kubernetes_manifest.nginx_fabric_gateway_external.manifest.metadata.name
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
+
+resource "kubernetes_manifest" "letsencrypt_issuer" {
+  manifest = {
+    apiVersion = "cert-manager.io/v1"
+    kind       = "ClusterIssuer"
+    metadata = {
+      name = "letsencrypt-issuer"
+    }
+    spec = {
+      acme = {
+        server  = "https://acme-v02.api.letsencrypt.org/directory"
+        email   = var.acme_registration_email
+        profile = "tlsserver"
+        privateKeySecretRef = {
+          name = "letsencrypt"
+        }
+        solvers = [
+          {
+            http01 = {
+              gatewayHTTPRoute = {
+                parentRefs = [
+                  {
+                    name = kubernetes_manifest.nginx_fabric_gateway_external.manifest.metadata.name
+                  }
+                ]
+              }
+            }
+          }
+        ]
       }
     }
   }
