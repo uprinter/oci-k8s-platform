@@ -32,4 +32,5 @@ module "nginx-gateway" {
   internal_dns_zone       = var.internal_hosted_zone_name
   external_dns_zone       = var.external_hosted_zone_name
   public_dns_zone_records = var.public_hosted_zone_records
+  acme_registration_email = var.acme_registration_email
 }

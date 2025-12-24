@@ -29,6 +29,11 @@ variable "public_dns_zone_records" {
   type        = list(string)
 }
 
+variable "acme_registration_email" {
+  description = "The email address for ACME registration"
+  type        = string
+}
+
 variable "lb_sg_id" {
   description = "The OCID of the network security group for the load balancer"
   type        = string
@@ -42,6 +47,47 @@ resource "helm_release" "nginx_fabric_gateway" {
   create_namespace = true
 }
 
+locals {
+  all_dns_zones = concat([var.external_dns_zone], var.public_dns_zone_records)
+  
+  https_listeners = [
+    for idx, zone in local.all_dns_zones : {
+      name     = "https-${idx + 1}"
+      port     = 443
+      protocol = "HTTPS"
+      hostname = idx == 0 ? "*.${zone}" : zone
+      allowedRoutes = {
+        namespaces = {
+          from = "All"
+        }
+      }
+      tls = {
+        mode = "Terminate"
+        certificateRefs = [
+          {
+            kind = "Secret"
+            name = idx == 0 ? kubernetes_manifest.external_certificate.manifest.metadata.name : "${replace(zone, ".", "-")}-cert"
+          }
+        ]
+      }
+    }
+  ]
+  
+  http_listeners = [
+    for idx, zone in var.public_dns_zone_records : {
+      name     = "http-${idx + 1}"
+      port     = 80
+      protocol = "HTTP"
+      hostname = zone
+      allowedRoutes = {
+        namespaces = {
+          from = "All"
+        }
+      }
+    }
+  ]
+}
+
 # External Gateway (via Load Balancer)
 resource "kubernetes_manifest" "nginx_fabric_gateway_external" {
   manifest = {
@@ -50,6 +96,9 @@ resource "kubernetes_manifest" "nginx_fabric_gateway_external" {
     metadata = {
       name      = "nginx-fabric-gateway-external"
       namespace = helm_release.nginx_fabric_gateway.metadata.namespace
+      annotations = {
+        "cert-manager.io/cluster-issuer" = "letsencrypt-issuer"
+      }
     }
     spec = {
       gatewayClassName = "nginx"
@@ -62,27 +111,7 @@ resource "kubernetes_manifest" "nginx_fabric_gateway_external" {
           "oci.oraclecloud.com/oci-network-security-groups"             = var.lb_sg_id
         }
       }
-      listeners = [
-        {
-          name     = "https"
-          port     = 443
-          protocol = "HTTPS"
-          allowedRoutes = {
-            namespaces = {
-              from = "All"
-            }
-          }
-          tls = {
-            mode = "Terminate"
-            certificateRefs = [
-              {
-                kind = "Secret"
-                name = kubernetes_manifest.external_certificate.manifest.metadata.name
-              }
-            ]
-          }
-        }
-      ]
+      listeners = concat(local.https_listeners, local.http_listeners)
     }
   }
 }
@@ -191,6 +220,39 @@ resource "kubernetes_manifest" "external_certificate" {
       issuerRef = {
         name = var.issuer_name
         kind = var.issuer_kind
+      }
+    }
+  }
+}
+
+resource "kubernetes_manifest" "letsencrypt_issuer" {
+  manifest = {
+    apiVersion = "cert-manager.io/v1"
+    kind       = "ClusterIssuer"
+    metadata = {
+      name = "letsencrypt-issuer"
+    }
+    spec = {
+      acme = {
+        server  = "https://acme-v02.api.letsencrypt.org/directory"
+        email   = var.acme_registration_email
+        profile = "tlsserver"
+        privateKeySecretRef = {
+          name = "letsencrypt"
+        }
+        solvers = [
+          {
+            http01 = {
+              gatewayHTTPRoute = {
+                parentRefs = [
+                  {
+                    name = kubernetes_manifest.nginx_fabric_gateway_external.manifest.metadata.name
+                  }
+                ]
+              }
+            }
+          }
+        ]
       }
     }
   }
