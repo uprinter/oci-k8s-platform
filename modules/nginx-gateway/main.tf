@@ -47,6 +47,51 @@ resource "helm_release" "nginx_fabric_gateway" {
   create_namespace = true
 }
 
+# Local values for dynamic listener generation
+locals {
+  # Create a list of all DNS zones (external + public records)
+  all_dns_zones = concat([var.external_dns_zone], var.public_dns_zone_records)
+  
+  # Generate HTTPS listeners for each DNS zone
+  https_listeners = [
+    for idx, zone in local.all_dns_zones : {
+      name     = "https-${idx + 1}"
+      port     = 443
+      protocol = "HTTPS"
+      hostname = idx == 0 ? "*.${zone}" : zone  # Wildcard for external_dns_zone, exact match for public records
+      allowedRoutes = {
+        namespaces = {
+          from = "All"
+        }
+      }
+      tls = {
+        mode = "Terminate"
+        certificateRefs = [
+          {
+            kind = "Secret"
+            name = idx == 0 ? kubernetes_manifest.external_certificate.manifest.metadata.name : "${replace(zone, ".", "-")}-cert"
+          }
+        ]
+      }
+    }
+  ]
+  
+  # Generate HTTP listeners for public DNS zone records (for ACME challenge)
+  http_listeners = [
+    for idx, zone in var.public_dns_zone_records : {
+      name     = "http-${idx + 1}"
+      port     = 80
+      protocol = "HTTP"
+      hostname = zone
+      allowedRoutes = {
+        namespaces = {
+          from = "All"
+        }
+      }
+    }
+  ]
+}
+
 # External Gateway (via Load Balancer)
 resource "kubernetes_manifest" "nginx_fabric_gateway_external" {
   manifest = {
@@ -70,61 +115,7 @@ resource "kubernetes_manifest" "nginx_fabric_gateway_external" {
           "oci.oraclecloud.com/oci-network-security-groups"             = var.lb_sg_id
         }
       }
-      listeners = [
-        {
-          name     = "https-1"
-          port     = 443
-          protocol = "HTTPS"
-          hostname = "*.${var.external_dns_zone}"
-          port     = 443
-          protocol = "HTTPS"
-          allowedRoutes = {
-            namespaces = {
-              from = "All"
-            }
-          }
-          tls = {
-            mode = "Terminate"
-            certificateRefs = [
-              {
-                kind = "Secret"
-                name = kubernetes_manifest.external_certificate.manifest.metadata.name
-              }
-            ]
-          }
-        },
-        {
-          name     = "https-3"
-          hostname = "2pm.ninja"
-          port     = 443
-          protocol = "HTTPS"
-          allowedRoutes = {
-            namespaces = {
-              from = "All"
-            }
-          }
-          tls = {
-            mode = "Terminate"
-            certificateRefs = [
-              {
-                kind = "Secret"
-                name = "2pm-ninja-cert"
-              }
-            ]
-          }
-        },
-        {
-          name     = "http-2"
-          hostname = "2pm.ninja"
-          port     = 80
-          protocol = "HTTP"
-          allowedRoutes = {
-            namespaces = {
-              from = "All"
-            }
-          }
-        }
-      ]
+      listeners = concat(local.https_listeners, local.http_listeners)
     }
   }
 }
