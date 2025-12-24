@@ -104,3 +104,11 @@ tasks:
         tofu apply \
           -var="oci_api_private_key=$PRIVATE_KEY" \
           -var="oci_api_private_key_fingerprint=$FINGERPRINT"
+
+  oci-platform:install-gitlab-agent:
+    desc: "Step 10. Install GitLab Agent"
+    dir: "10-gitlab-agent"
+    cmds:
+      - echo "Installing GitLab Agent..."
+      - tofu init
+      - tofu apply
