@@ -1,6 +1,11 @@
 variable "compartment_id" { type = string }
 variable "region" { type = string }
 variable "oci_api_public_key" { type = string }
+variable "approved_sender_emails" {
+  type    = list(string)
+  default = []
+}
+
 variable "technical_users_domain_name" { type = string }
 variable "technical_users_domain_url" { type = string }
 
@@ -145,4 +150,50 @@ resource "oci_identity_policy" "external_secrets_policy" {
 
 output "external_secrets_user_ocid" {
   value = oci_identity_domains_user.external_secrets_user.ocid
+}
+
+resource "oci_identity_domains_user" "email_sender_user" {
+  idcs_endpoint = var.technical_users_domain_url
+  schemas = [
+    "urn:ietf:params:scim:schemas:core:2.0:User",
+    "urn:ietf:params:scim:schemas:oracle:idcs:extension:userState:User",
+    "urn:ietf:params:scim:schemas:oracle:idcs:extension:OCITags",
+    "urn:ietf:params:scim:schemas:oracle:idcs:extension:capabilities:User",
+    "urn:ietf:params:scim:schemas:oracle:idcs:extension:user:User"
+  ]
+  user_name = "email-sender"
+  name {
+    family_name = "EmailSender"
+  }
+}
+
+resource "oci_identity_domains_group" "email_sender_group" {
+  display_name   = "Email Senders"
+  idcs_endpoint  = var.technical_users_domain_url
+  attribute_sets = ["all"]
+  schemas = [
+    "urn:ietf:params:scim:schemas:core:2.0:Group",
+    "urn:ietf:params:scim:schemas:oracle:idcs:extension:OCITags",
+    "urn:ietf:params:scim:schemas:oracle:idcs:extension:group:Group",
+  ]
+
+  members {
+    value = oci_identity_domains_user.email_sender_user.id
+    type  = "User"
+  }
+}
+
+resource "oci_identity_policy" "email_sender_policy" {
+  compartment_id = var.compartment_id
+  name           = "email-sender-policy"
+  description    = "Policy for Email Sender"
+  statements = [
+    "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.email_sender_group.display_name}' to use email-family in compartment id ${var.compartment_id}"
+  ]
+}
+
+resource "oci_email_sender" "approved_sender" {
+  for_each       = toset(var.approved_sender_emails)
+  compartment_id = var.compartment_id
+  email_address  = each.value
 }
