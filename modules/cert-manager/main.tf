@@ -60,6 +60,8 @@ resource "kubernetes_manifest" "root_ca_cert" {
       isCA       = true
       commonName = "Root CA"
       secretName = "root-ca-cert"
+      duration   = "87600h" # 10 years
+      renewBefore = "8760h" # 1 year before expiry
       privateKey = {
         algorithm = "RSA"
         size      = 2048
@@ -101,6 +103,8 @@ resource "kubernetes_manifest" "intermediate_ca_cert" {
       isCA       = true
       commonName = "Intermediate CA"
       secretName = "intermediate-ca-cert"
+      duration   = "8760h" # 1 year
+      renewBefore = "720h" # 30 days before expiry
       privateKey = {
         algorithm = "RSA"
         size      = 2048
