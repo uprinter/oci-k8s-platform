@@ -15,12 +15,13 @@ provider "oci" {
 }
 
 module "identity" {
-  source                      = "../modules/identity"
-  compartment_id              = var.root_compartment_id
-  region                      = var.region
-  oci_api_public_key          = var.oci_api_public_key
-  technical_users_domain_url  = var.technical_users_domain_url
-  technical_users_domain_name = var.technical_users_domain_name
+  source                        = "../modules/identity"
+  compartment_id                = var.root_compartment_id
+  region                        = var.region
+  oci_api_public_key            = var.oci_api_public_key
+  technical_users_domain_url    = var.technical_users_domain_url
+  technical_users_domain_name   = var.technical_users_domain_name
+  approved_sender_emails        = var.approved_sender_emails
 }
 
 output "technical_users_domain_url" {

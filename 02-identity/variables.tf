@@ -22,3 +22,9 @@ variable "technical_users_domain_name" {
   description = "Technical users domain name"
   type        = string
 }
+
+variable "approved_sender_emails" {
+  description = "List of email addresses to be approved senders"
+  type        = list(string)
+  default     = []
+}
