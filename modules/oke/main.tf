@@ -64,9 +64,10 @@ resource "oci_containerengine_node_pool" "node_pool" {
     }
 
     node_pool_pod_network_option_details {
-      cni_type       = var.cni_type
-      pod_subnet_ids = var.pod_subnet_ids
-      pod_nsg_ids    = [var.pod_sg_id]
+      cni_type          = var.cni_type
+      pod_subnet_ids    = var.pod_subnet_ids
+      pod_nsg_ids       = [var.pod_sg_id]
+      max_pods_per_node = 62
     }
   }
 
