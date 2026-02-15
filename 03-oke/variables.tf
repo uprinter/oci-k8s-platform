@@ -17,7 +17,7 @@ variable "cluster_name" {
 variable "kubernetes_version" {
   description = "Kubernetes version"
   type        = string
-  default     = "v1.34.1"
+  default     = "v1.34.2"
 }
 
 variable "cni_type" {
