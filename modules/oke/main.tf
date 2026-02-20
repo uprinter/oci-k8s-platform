@@ -18,6 +18,21 @@ variable "cni_type" { type = string }
 variable "api_sg_id" { type = string }
 variable "worker_sg_id" { type = string }
 variable "pod_sg_id" { type = string }
+variable "use_preemptible_nodes" { 
+  type = bool 
+  default = false
+  description = "Whether to use preemptible capacity for worker nodes"
+}
+variable "preserve_boot_volume_on_preemption" { 
+  type = bool 
+  default = false
+  description = "Whether to preserve boot volume when preemptible node is reclaimed"
+}
+variable "capacity_reservation_id" {
+  type = string
+  default = null
+  description = "OCID of compute capacity reservation for worker nodes"
+}
 
 resource "oci_containerengine_cluster" "oke_cluster" {
   compartment_id     = var.compartment_id
@@ -61,6 +76,17 @@ resource "oci_containerengine_node_pool" "node_pool" {
     placement_configs {
       subnet_id           = var.node_pool_subnet_id
       availability_domain = var.availability_domain
+      capacity_reservation_id = var.capacity_reservation_id
+
+      dynamic "preemptible_node_config" {
+        for_each = var.use_preemptible_nodes ? [1] : []
+        content {
+          preemption_action {
+            type = "TERMINATE"
+            is_preserve_boot_volume = var.preserve_boot_volume_on_preemption
+          }
+        }
+      }
     }
 
     node_pool_pod_network_option_details {
