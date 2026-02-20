@@ -47,13 +47,13 @@ variable "node_shape" {
 variable "node_ocpus" {
   description = "Number of OCPUs per node"
   type        = number
-  default     = 3
+  default     = 8
 }
 
 variable "node_memory_in_gbs" {
   description = "Memory in GBs per node"
   type        = number
-  default     = 25
+  default     = 27
 }
 
 variable "node_count" {
@@ -105,4 +105,22 @@ variable "worker_nsg_id" {
 variable "pod_nsg_id" {
   description = "Pod NSG ID"
   type        = string
+}
+
+variable "use_preemptible_nodes" {
+  description = "Whether to use preemptible capacity for worker nodes (50% cost savings)"
+  type        = bool
+  default     = false
+}
+
+variable "preserve_boot_volume_on_preemption" {
+  description = "Whether to preserve boot volume when preemptible node is reclaimed"
+  type        = bool
+  default     = false
+}
+
+variable "capacity_reservation_id" {
+  description = "OCID of compute capacity reservation for worker nodes (optional)"
+  type        = string
+  default     = null
 }
