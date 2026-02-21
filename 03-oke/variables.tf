@@ -124,3 +124,9 @@ variable "capacity_reservation_id" {
   type        = string
   default     = null
 }
+
+variable "boot_volume_size_in_gbs" {
+  description = "Boot volume size in GBs for worker nodes (minimum 50 GB)"
+  type        = number
+  default     = 50
+}

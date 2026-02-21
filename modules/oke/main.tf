@@ -33,6 +33,11 @@ variable "capacity_reservation_id" {
   default = null
   description = "OCID of compute capacity reservation for worker nodes"
 }
+variable "boot_volume_size_in_gbs" {
+  type = number
+  default = 50
+  description = "Boot volume size in GBs for worker nodes (minimum 50 GB)"
+}
 
 resource "oci_containerengine_cluster" "oke_cluster" {
   compartment_id     = var.compartment_id
@@ -98,8 +103,9 @@ resource "oci_containerengine_node_pool" "node_pool" {
   }
 
   node_source_details {
-    image_id    = var.node_image_id
-    source_type = "IMAGE"
+    image_id                = var.node_image_id
+    source_type             = "IMAGE"
+    boot_volume_size_in_gbs = var.boot_volume_size_in_gbs
   }
 }
 
