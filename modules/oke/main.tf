@@ -74,6 +74,19 @@ resource "oci_containerengine_node_pool" "node_pool" {
     memory_in_gbs = var.node_memory_in_gbs
   }
 
+  node_metadata = {
+    user_data = base64encode(<<-EOF
+      #!/bin/bash
+      # Expand filesystem to use full boot volume size
+      /usr/libexec/oci-growfs -y
+      
+      # Run OKE initialization script
+      curl --fail -H "Authorization: Bearer Oracle" -L0 http://169.254.169.254/opc/v2/instance/metadata/oke_init_script | base64 --decode >/var/run/oke-init.sh
+      bash /var/run/oke-init.sh
+    EOF
+    )
+  }
+
   node_config_details {
     size    = var.node_count
     nsg_ids = [var.worker_sg_id]
