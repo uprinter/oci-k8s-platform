@@ -647,8 +647,8 @@ resource "oci_core_network_security_group_security_rule" "pod_egress_oci_service
   destination_type          = "SERVICE_CIDR_BLOCK"
 }
 
-# Allow pods to communicate with internet.
-resource "oci_core_network_security_group_security_rule" "pod_egress_internet" {
+# Allow pods to communicate with internet over HTTPS.
+resource "oci_core_network_security_group_security_rule" "pod_egress_internet_https" {
   network_security_group_id = oci_core_network_security_group.k8s_pod_nsg.id
   direction                 = "EGRESS"
   protocol                  = "6" // TCP
@@ -658,6 +658,21 @@ resource "oci_core_network_security_group_security_rule" "pod_egress_internet" {
     destination_port_range {
       min = 443
       max = 443
+    }
+  }
+}
+
+# Allow pods to access public HTTP.
+resource "oci_core_network_security_group_security_rule" "pod_egress_internet_http" {
+  network_security_group_id = oci_core_network_security_group.k8s_pod_nsg.id
+  direction                 = "EGRESS"
+  protocol                  = "6" // TCP
+  destination               = "0.0.0.0/0"
+  destination_type          = "CIDR_BLOCK"
+  tcp_options {
+    destination_port_range {
+      min = 80
+      max = 80
     }
   }
 }
