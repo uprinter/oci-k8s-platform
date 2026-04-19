@@ -130,3 +130,9 @@ variable "boot_volume_size_in_gbs" {
   type        = number
   default     = 50
 }
+
+variable "ssh_public_key" {
+  description = "SSH public key to install on OKE worker nodes"
+  type        = string
+  default     = null
+}

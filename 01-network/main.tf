@@ -26,7 +26,7 @@ output "vcn_id" {
 
 output "subnet_ids" {
   value       = module.network.subnet_ids
-  description = "Map of subnet IDs (worker, api, lb, pod, vpn)"
+  description = "Map of subnet IDs (worker, api, lb, pod, vpn, fss_mount_target)"
 }
 
 output "nsg_ids" {

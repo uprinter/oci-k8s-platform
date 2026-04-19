@@ -18,25 +18,30 @@ variable "cni_type" { type = string }
 variable "api_sg_id" { type = string }
 variable "worker_sg_id" { type = string }
 variable "pod_sg_id" { type = string }
-variable "use_preemptible_nodes" { 
-  type = bool 
-  default = false
+variable "use_preemptible_nodes" {
+  type        = bool
+  default     = false
   description = "Whether to use preemptible capacity for worker nodes"
 }
-variable "preserve_boot_volume_on_preemption" { 
-  type = bool 
-  default = false
+variable "preserve_boot_volume_on_preemption" {
+  type        = bool
+  default     = false
   description = "Whether to preserve boot volume when preemptible node is reclaimed"
 }
 variable "capacity_reservation_id" {
-  type = string
-  default = null
+  type        = string
+  default     = null
   description = "OCID of compute capacity reservation for worker nodes"
 }
 variable "boot_volume_size_in_gbs" {
-  type = number
-  default = 50
+  type        = number
+  default     = 50
   description = "Boot volume size in GBs for worker nodes (minimum 50 GB)"
+}
+variable "ssh_public_key" {
+  type        = string
+  default     = null
+  description = "SSH public key to add to worker nodes"
 }
 
 resource "oci_containerengine_cluster" "oke_cluster" {
@@ -79,12 +84,13 @@ resource "oci_containerengine_node_pool" "node_pool" {
       #!/bin/bash
       # Expand filesystem to use full boot volume size
       /usr/libexec/oci-growfs -y
-      
+
       # Run OKE initialization script
       curl --fail -H "Authorization: Bearer Oracle" -L0 http://169.254.169.254/opc/v2/instance/metadata/oke_init_script | base64 --decode >/var/run/oke-init.sh
       bash /var/run/oke-init.sh
     EOF
     )
+    ssh_authorized_keys = var.ssh_public_key
   }
 
   node_config_details {
@@ -92,15 +98,15 @@ resource "oci_containerengine_node_pool" "node_pool" {
     nsg_ids = [var.worker_sg_id]
 
     placement_configs {
-      subnet_id           = var.node_pool_subnet_id
-      availability_domain = var.availability_domain
+      subnet_id               = var.node_pool_subnet_id
+      availability_domain     = var.availability_domain
       capacity_reservation_id = var.capacity_reservation_id
 
       dynamic "preemptible_node_config" {
         for_each = var.use_preemptible_nodes ? [1] : []
         content {
           preemption_action {
-            type = "TERMINATE"
+            type                    = "TERMINATE"
             is_preserve_boot_volume = var.preserve_boot_volume_on_preemption
           }
         }
