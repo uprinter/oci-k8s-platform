@@ -6,16 +6,25 @@ tasks:
     cmds:
       - oci session authenticate
 
-  oci-platform:generate-keys:
+  oci-platform:generate-dns-keys:
     desc: "Step 0. Generate key pair for ExternalDNS"
     cmds:
       - echo "Generating key pair for ExternalDNS"
-      - rm -rf ./.keys
-      - mkdir ./.keys
-      - openssl genrsa -out .keys/oci_api_key.pem 2048
-      - openssl rsa -pubout -in .keys/oci_api_key.pem -out .keys/oci_api_key_public.pem
-      - openssl rsa -pubout -outform DER -in .keys/oci_api_key.pem | openssl md5 -c | sed 's/^.*= //' > .keys/fingerprint.txt
-      - echo "Keys generated in .keys/ directory"
+      - rm -rf ./.keys/dns
+      - mkdir -p ./.keys/dns
+      - openssl genrsa -out .keys/dns/oci_api_key.pem 2048
+      - openssl rsa -pubout -in .keys/dns/oci_api_key.pem -out .keys/dns/oci_api_key_public.pem
+      - openssl rsa -pubout -outform DER -in .keys/dns/oci_api_key.pem | openssl md5 -c | sed 's/^.*= //' > .keys/dns/fingerprint.txt
+      - echo "Keys generated in .keys/dns/ directory"
+
+  oci-platform:generate-ssh-keys:
+    desc: "Step 0. Generate SSH key pair for OKE worker nodes"
+    cmds:
+      - echo "Generating SSH key pair for OKE worker nodes"
+      - rm -rf ./.keys/ssh
+      - mkdir -p ./.keys/ssh
+      - ssh-keygen -t ed25519 -f .keys/ssh/id_ed25519 -N '' -C oke-worker
+      - echo "SSH keys generated in .keys/ssh/ directory"
 
   oci-platform:install-network:
     desc: "Step 1. Install network layer"
@@ -31,7 +40,7 @@ tasks:
     cmds:
       - echo "Installing identity layer..."
       - |
-        PUBLIC_KEY=$(cat ../.keys/oci_api_key_public.pem)
+        PUBLIC_KEY=$(cat ../.keys/dns/oci_api_key_public.pem)
         tofu init
         tofu apply -var="oci_api_public_key=$PUBLIC_KEY"
 
@@ -40,8 +49,10 @@ tasks:
     dir: 03-oke
     cmds:
       - echo "Installing OKE..."
-      - tofu init
-      - tofu apply
+      - |
+        SSH_PUBLIC_KEY=$(cat ../.keys/ssh/id_ed25519.pub)
+        tofu init
+        tofu apply -var="ssh_public_key=$SSH_PUBLIC_KEY"
 
   oci-platform:install-dns:
     desc: "Step 4. Install DNS"
@@ -82,8 +93,8 @@ tasks:
     cmds:
       - echo "Installing ExternalDNS..."
       - |
-        PRIVATE_KEY=$(cat ../.keys/oci_api_key.pem)
-        FINGERPRINT=$(cat ../.keys/fingerprint.txt)
+        PRIVATE_KEY=$(cat ../.keys/dns/oci_api_key.pem)
+        FINGERPRINT=$(cat ../.keys/dns/fingerprint.txt)
         tofu init
         tofu apply \
           -var="oci_api_private_key=$PRIVATE_KEY" \
@@ -95,8 +106,8 @@ tasks:
     cmds:
       - echo "Installing ExternalSecrets..."
       - |
-        PRIVATE_KEY=$(cat ../.keys/oci_api_key.pem)
-        FINGERPRINT=$(cat ../.keys/fingerprint.txt)
+        PRIVATE_KEY=$(cat ../.keys/dns/oci_api_key.pem)
+        FINGERPRINT=$(cat ../.keys/dns/fingerprint.txt)
         tofu init
         tofu apply -exclude="module.external-secrets.kubernetes_manifest.oci_secret_store" \
           -var="oci_api_private_key=$PRIVATE_KEY" \
@@ -110,5 +121,13 @@ tasks:
     dir: "10-gitlab-agent"
     cmds:
       - echo "Installing GitLab Agent..."
+      - tofu init
+      - tofu apply
+
+  oci-platform:install-filesystem-storage-class:
+    desc: "Step 11. Install OCI File Storage storage class"
+    dir: "11-filesystem-storage-class"
+    cmds:
+      - echo "Installing OCI File Storage storage class..."
       - tofu init
       - tofu apply

@@ -44,6 +44,7 @@ module "oke" {
   preserve_boot_volume_on_preemption = var.preserve_boot_volume_on_preemption
   capacity_reservation_id            = var.capacity_reservation_id
   boot_volume_size_in_gbs            = var.boot_volume_size_in_gbs
+  ssh_public_key                     = var.ssh_public_key
 }
 
 output "oke_external_secrets_vault_ocid" {

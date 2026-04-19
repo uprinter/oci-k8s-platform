@@ -50,13 +50,14 @@ task oci-platform:install-identity
 ### Step 3. Deploy OKE Cluster
 
 ```bash
+task oci-platform:generate-ssh-keys
 task oci-platform:install-oke
 ```
 
 ### Step 4. Deploy DNS Module
 
 ```bash
-task oci-platform:generate-keys
+task oci-platform:generate-dns-keys
 task oci-platform:install-dns
 ```
 
@@ -143,3 +144,18 @@ task oci-platform:install-external-secrets
 ```bash
 task oci-platform:install-gitlab-agent
 ```
+
+#### Step 6.6. Deploy OCI File Storage StorageClass
+
+```bash
+task oci-platform:install-filesystem-storage-class
+```
+
+This creates a Kubernetes `StorageClass` backed by the OCI File Storage CSI driver (`fss.csi.oraclecloud.com`).
+
+Before applying it:
+
+- Ensure the Step 2 identity layer has been reapplied so the new `oke-fss-csi-policy` exists.
+- In `11-filesystem-storage-class/terraform.tfvars`, set `mount_target_subnet_ocid` to the dedicated `subnet_ids.fss_mount_target` output from `01-network`.
+- This stack now creates one shared mount target up front and passes its `mountTargetOcid` into the StorageClass, so dynamically provisioned PVCs reuse the same mount target instead of creating new ones.
+- Configure the File Storage network security rules for the worker nodes and mount target as described in Oracle's manual: https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengcreatingpersistentvolumeclaim_Provisioning_PVCs_on_FSS.htm

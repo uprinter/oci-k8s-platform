@@ -152,6 +152,16 @@ output "external_secrets_user_ocid" {
   value = oci_identity_domains_user.external_secrets_user.ocid
 }
 
+resource "oci_identity_policy" "oke_fss_csi_policy" {
+  compartment_id = var.compartment_id
+  name           = "oke-fss-csi-policy"
+  description    = "Policy for the OKE File Storage CSI driver"
+  statements = [
+    "Allow any-user to manage file-family in compartment id ${var.compartment_id} where request.principal.type = 'cluster'",
+    "Allow any-user to use virtual-network-family in compartment id ${var.compartment_id} where request.principal.type = 'cluster'"
+  ]
+}
+
 resource "oci_identity_domains_user" "email_sender_user" {
   idcs_endpoint = var.technical_users_domain_url
   schemas = [

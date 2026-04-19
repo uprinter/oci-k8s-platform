@@ -92,6 +92,52 @@ resource "oci_core_route_table" "vpn_rt" {
   }
 }
 
+resource "oci_core_security_list" "fss_mount_target_sl" {
+  compartment_id = var.compartment_id
+  vcn_id         = oci_core_vcn.k8s_vcn.id
+  display_name   = "fss_mount_target_sl"
+
+  ingress_security_rules {
+    protocol = "6" // TCP
+    source   = oci_core_subnet.k8s_worker_subnet.cidr_block
+
+    tcp_options {
+      min = 111
+      max = 111
+    }
+  }
+
+  ingress_security_rules {
+    protocol = "6" // TCP
+    source   = oci_core_subnet.k8s_worker_subnet.cidr_block
+
+    tcp_options {
+      min = 2048
+      max = 2050
+    }
+  }
+
+  ingress_security_rules {
+    protocol = "17" // UDP
+    source   = oci_core_subnet.k8s_worker_subnet.cidr_block
+
+    udp_options {
+      min = 111
+      max = 111
+    }
+  }
+
+  ingress_security_rules {
+    protocol = "17" // UDP
+    source   = oci_core_subnet.k8s_worker_subnet.cidr_block
+
+    udp_options {
+      min = 2048
+      max = 2048
+    }
+  }
+}
+
 resource "oci_core_subnet" "k8s_worker_subnet" {
   compartment_id             = var.compartment_id
   vcn_id                     = oci_core_vcn.k8s_vcn.id
@@ -138,6 +184,17 @@ resource "oci_core_subnet" "vpn_subnet" {
   cidr_block     = "10.0.3.0/24"
   route_table_id = oci_core_route_table.vpn_rt.id
   dns_label      = "vpn"
+}
+
+resource "oci_core_subnet" "fss_mount_target_subnet" {
+  compartment_id             = var.compartment_id
+  vcn_id                     = oci_core_vcn.k8s_vcn.id
+  display_name               = "fss_mount_target_subnet"
+  cidr_block                 = "10.0.4.0/28"
+  route_table_id             = oci_core_route_table.k8s_worker_rt.id
+  security_list_ids          = [oci_core_security_list.fss_mount_target_sl.id]
+  dns_label                  = "fssmt"
+  prohibit_public_ip_on_vnic = true
 }
 
 resource "oci_core_network_security_group" "k8s_api_nsg" {
@@ -370,6 +427,22 @@ resource "oci_core_network_security_group_security_rule" "worker_ingress_vpn" {
   }
 }
 
+# Allow VPN to SSH to worker nodes.
+resource "oci_core_network_security_group_security_rule" "worker_ingress_vpn_ssh" {
+  network_security_group_id = oci_core_network_security_group.k8s_worker_nsg.id
+  description               = "Allow VPN to SSH to worker nodes."
+  direction                 = "INGRESS"
+  protocol                  = "6" // TCP
+  source                    = oci_core_subnet.vpn_subnet.cidr_block
+  source_type               = "CIDR_BLOCK"
+  tcp_options {
+    destination_port_range {
+      min = 22
+      max = 22
+    }
+  }
+}
+
 # Path Discovery.
 resource "oci_core_network_security_group_security_rule" "worker_ingress_path_discovery" {
   network_security_group_id = oci_core_network_security_group.k8s_worker_nsg.id
@@ -494,6 +567,70 @@ resource "oci_core_network_security_group_security_rule" "worker_egress_api_cont
     destination_port_range {
       min = 12250
       max = 12250
+    }
+  }
+}
+
+resource "oci_core_network_security_group_security_rule" "worker_egress_fss_tcp" {
+  network_security_group_id = oci_core_network_security_group.k8s_worker_nsg.id
+  description               = "Allow worker nodes to communicate with File Storage mount targets over TCP."
+  direction                 = "EGRESS"
+  protocol                  = "6" // TCP
+  destination               = oci_core_subnet.fss_mount_target_subnet.cidr_block
+  destination_type          = "CIDR_BLOCK"
+
+  tcp_options {
+    destination_port_range {
+      min = 111
+      max = 111
+    }
+  }
+}
+
+resource "oci_core_network_security_group_security_rule" "worker_egress_fss_tcp_nfs" {
+  network_security_group_id = oci_core_network_security_group.k8s_worker_nsg.id
+  description               = "Allow worker nodes to communicate with File Storage mount targets over NFS TCP ports."
+  direction                 = "EGRESS"
+  protocol                  = "6" // TCP
+  destination               = oci_core_subnet.fss_mount_target_subnet.cidr_block
+  destination_type          = "CIDR_BLOCK"
+
+  tcp_options {
+    destination_port_range {
+      min = 2048
+      max = 2050
+    }
+  }
+}
+
+resource "oci_core_network_security_group_security_rule" "worker_egress_fss_udp" {
+  network_security_group_id = oci_core_network_security_group.k8s_worker_nsg.id
+  description               = "Allow worker nodes to communicate with File Storage mount targets over UDP."
+  direction                 = "EGRESS"
+  protocol                  = "17" // UDP
+  destination               = oci_core_subnet.fss_mount_target_subnet.cidr_block
+  destination_type          = "CIDR_BLOCK"
+
+  udp_options {
+    destination_port_range {
+      min = 111
+      max = 111
+    }
+  }
+}
+
+resource "oci_core_network_security_group_security_rule" "worker_egress_fss_udp_mount" {
+  network_security_group_id = oci_core_network_security_group.k8s_worker_nsg.id
+  description               = "Allow worker nodes to communicate with File Storage mount targets over UDP mount port."
+  direction                 = "EGRESS"
+  protocol                  = "17" // UDP
+  destination               = oci_core_subnet.fss_mount_target_subnet.cidr_block
+  destination_type          = "CIDR_BLOCK"
+
+  udp_options {
+    destination_port_range {
+      min = 2048
+      max = 2048
     }
   }
 }
@@ -781,11 +918,12 @@ output "vcn_id" {
 
 output "subnet_ids" {
   value = {
-    api    = oci_core_subnet.k8s_api_subnet.id
-    worker = oci_core_subnet.k8s_worker_subnet.id
-    lb     = oci_core_subnet.k8s_lb_subnet.id,
-    pod    = oci_core_subnet.k8s_pod_subnet.id
-    vpn    = oci_core_subnet.vpn_subnet.id
+    api              = oci_core_subnet.k8s_api_subnet.id
+    worker           = oci_core_subnet.k8s_worker_subnet.id
+    lb               = oci_core_subnet.k8s_lb_subnet.id,
+    pod              = oci_core_subnet.k8s_pod_subnet.id
+    vpn              = oci_core_subnet.vpn_subnet.id
+    fss_mount_target = oci_core_subnet.fss_mount_target_subnet.id
   }
 }
 
