@@ -50,7 +50,7 @@ tasks:
     cmds:
       - echo "Installing OKE..."
       - |
-        SSH_PUBLIC_KEY=$(cat ../.keys/ssh/id_ed25519.pub)
+        SSH_PUBLIC_KEY=$(cat ../.keys/ssh/ssh_public.key)
         tofu init
         tofu apply -var="ssh_public_key=$SSH_PUBLIC_KEY"
 
