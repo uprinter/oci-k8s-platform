@@ -14,6 +14,11 @@ Default setup manages the following components:
 - [**cert-manager**](http://cert-manager.io/) for automated TLS certificate management
 - [**F5 NGINX Gateway Fabric**](https://docs.nginx.com/nginx-gateway-fabric) as a Kubernetes Gateway API implementation
 - [**ExternalDNS**](https://github.com/kubernetes-sigs/external-dns) for automatic DNS record management for Kubernetes services
+- [**Cloudflare Origin CA issuer**](https://github.com/cloudflare/origin-ca-issuer) (optional) for issuing origin certificates to hosts served behind Cloudflare's proxy
+
+## ⚠️ This repository is PUBLIC
+
+This repo is published on GitHub. **No domain names, hostnames, project names, or other identifying values may appear as defaults or in comments in any tracked file** (`*.tf`, `*.md`, `*.yaml`). Such values are declared as required variables with **no default** and supplied only through each stack's gitignored `terraform.tfvars`. When adding a variable whose value is environment- or domain-specific, give it no default and document it generically — never bake the real value into tracked code.
 
 ## Prerequisites
 
@@ -159,3 +164,22 @@ Before applying it:
 - In `11-filesystem-storage-class/terraform.tfvars`, set `mount_target_subnet_ocid` to the dedicated `subnet_ids.fss_mount_target` output from `01-network`.
 - This stack now creates one shared mount target up front and passes its `mountTargetOcid` into the StorageClass, so dynamically provisioned PVCs reuse the same mount target instead of creating new ones.
 - Configure the File Storage network security rules for the worker nodes and mount target as described in Oracle's manual: https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengcreatingpersistentvolumeclaim_Provisioning_PVCs_on_FSS.htm
+
+#### Step 6.7. Deploy Cloudflare Origin CA Issuer (optional)
+
+```bash
+task oci-platform:install-origin-ca-issuer
+```
+
+Installs the [Cloudflare Origin CA issuer](https://github.com/cloudflare/origin-ca-issuer) and issues an origin certificate for a host served behind Cloudflare's proxy (Full/strict SSL). Use this when a public hostname on the shared Load Balancer is fronted by Cloudflare rather than getting a public Let's Encrypt certificate directly.
+
+Depends on Steps 6.2 (NGINX Gateway) and 6.4 (External Secrets): the origin certificate's Secret is written into the gateway namespace, and the scoped Cloudflare Origin CA API token is pulled from OCI Vault through the existing `oci-secret-store` `ClusterSecretStore`.
+
+**Two-phase apply.** Like External Secrets (Step 6.4), the task runs `tofu apply` twice: the first pass (with `-exclude` on the `ExternalSecret`, `ClusterOriginIssuer`, and `Certificate`) installs the namespace, the issuer CRDs, and the Helm chart; the second unrestricted pass creates the custom resources once their CRDs exist. Run it via the task above — do not run a single `tofu apply`.
+
+Before applying it:
+
+- Create `12-origin-ca-issuer/terraform.tfvars` (gitignored) and set the required variables — notably the name of the OCI Vault secret holding the scoped Origin CA token, the origin certificate's Secret name (must match the name the gateway listener expects, `replace(host, ".", "-") + "-cert"`), and its SANs. None of these have defaults, by design (see the public-repo rule above).
+- The origin certificate is intentionally named identically to its target Secret and carries no owner reference, so cert-manager's Gateway shim detects it and does not issue a competing certificate for the same listener.
+
+> The shared Load Balancer NSG (`modules/network`) intentionally keeps its world-open `:443` ingress rule — a Cloudflare-only firewall lockdown was considered and deliberately not adopted, to keep the LB flexible for non-Cloudflare-fronted traffic. The origin is reachable directly, not only through Cloudflare's proxy; that tradeoff is a conscious choice, not an oversight.

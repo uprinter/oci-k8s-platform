@@ -131,3 +131,16 @@ tasks:
       - echo "Installing OCI File Storage storage class..."
       - tofu init
       - tofu apply
+
+  oci-platform:install-origin-ca-issuer:
+    desc: "Step 12. Install Cloudflare Origin CA issuer (two-phase apply)"
+    dir: "12-origin-ca-issuer"
+    cmds:
+      - echo "Installing Origin CA issuer..."
+      - |
+        tofu init
+        tofu apply \
+          -exclude="module.origin-ca-issuer.kubernetes_manifest.origin_ca_token" \
+          -exclude="module.origin-ca-issuer.kubernetes_manifest.cluster_origin_issuer" \
+          -exclude="module.origin-ca-issuer.kubernetes_manifest.origin_certificate"
+        tofu apply
