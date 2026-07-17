@@ -4,7 +4,20 @@
 provider "registry.opentofu.org/hashicorp/oci" {
   version = "7.26.1"
   hashes = [
+    "h1:+8UeBTH9GLaNQbsO0CiZ/PZyjRm7sQIcx1F1cJ30QdM=",
+    "h1:0UUKsWrSCUfhbxjbVxx8nAjsYJ0SAXzhuBK9yxNchZA=",
+    "h1:9Ik6P2RNebtBcfPNSN1ZoTjqU+YwPPe3//n68/y0MAU=",
+    "h1:E2E055BByvKAUPRk8dmCOjdV3Ro2fM1VCjZYGDMr/zI=",
+    "h1:H/GvHMf50egKyJeH3GKPgqo8iZ2pYw8cfaTWBnP4q8Q=",
+    "h1:LpxjVTCtjBAtpbU6nrjsW2Z9K7AEBZoLpbccDph98us=",
+    "h1:PrdoHM0/zHXTLknKNf4UlVGRQnfoghDouqAFsznnkaA=",
+    "h1:c+nB2eo8oDluvfyU2S2O15Rt/MtIFXTYNw112H6c684=",
     "h1:ey2lkeEJFSm8jL4DPE+odhiQqtdEotl31yYWHL/D0rc=",
+    "h1:k1mRdWrFbdjxl36gL2A8pnfE3QB9Pmf4wrhaS7kT0rk=",
+    "h1:o+uzdfiMDqCMPi+S54HwLq6oFuyqx0Hlnu+fazXpDKo=",
+    "h1:pJrDHD/HZ7VVlqfSluqMc8N1K6SBWAHEx76fqKglPxc=",
+    "h1:srLqHXhN+fhqiuxQj4wR8yVWAcIKtGrRlWaOF0hG13E=",
+    "h1:u7/69HbRYnd99Rz6vXokgd0kcbT78krhvnnzo+P6vQc=",
     "zh:045083bdc2950d82b4b31ddf420f683e85b1299cd948406c3029d28178465751",
     "zh:0df1ea1f3f89ce91ab97c3d3c7afbabac862a3ce6b609cd233ed7a8c9929f2ae",
     "zh:1b8f9cd4a406b63ac94bb40a8d1d249eb26de0ef302840749e60b92b1926745e",
@@ -27,7 +40,20 @@ provider "registry.opentofu.org/oracle/oci" {
   version     = "7.26.1"
   constraints = ">= 7.25.0"
   hashes = [
+    "h1:+8UeBTH9GLaNQbsO0CiZ/PZyjRm7sQIcx1F1cJ30QdM=",
+    "h1:0UUKsWrSCUfhbxjbVxx8nAjsYJ0SAXzhuBK9yxNchZA=",
+    "h1:9Ik6P2RNebtBcfPNSN1ZoTjqU+YwPPe3//n68/y0MAU=",
+    "h1:E2E055BByvKAUPRk8dmCOjdV3Ro2fM1VCjZYGDMr/zI=",
+    "h1:H/GvHMf50egKyJeH3GKPgqo8iZ2pYw8cfaTWBnP4q8Q=",
+    "h1:LpxjVTCtjBAtpbU6nrjsW2Z9K7AEBZoLpbccDph98us=",
+    "h1:PrdoHM0/zHXTLknKNf4UlVGRQnfoghDouqAFsznnkaA=",
+    "h1:c+nB2eo8oDluvfyU2S2O15Rt/MtIFXTYNw112H6c684=",
     "h1:ey2lkeEJFSm8jL4DPE+odhiQqtdEotl31yYWHL/D0rc=",
+    "h1:k1mRdWrFbdjxl36gL2A8pnfE3QB9Pmf4wrhaS7kT0rk=",
+    "h1:o+uzdfiMDqCMPi+S54HwLq6oFuyqx0Hlnu+fazXpDKo=",
+    "h1:pJrDHD/HZ7VVlqfSluqMc8N1K6SBWAHEx76fqKglPxc=",
+    "h1:srLqHXhN+fhqiuxQj4wR8yVWAcIKtGrRlWaOF0hG13E=",
+    "h1:u7/69HbRYnd99Rz6vXokgd0kcbT78krhvnnzo+P6vQc=",
     "zh:045083bdc2950d82b4b31ddf420f683e85b1299cd948406c3029d28178465751",
     "zh:0df1ea1f3f89ce91ab97c3d3c7afbabac862a3ce6b609cd233ed7a8c9929f2ae",
     "zh:1b8f9cd4a406b63ac94bb40a8d1d249eb26de0ef302840749e60b92b1926745e",

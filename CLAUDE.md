@@ -4,7 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-OpenTofu (Terraform) IaC for a Kubernetes platform on Oracle Cloud Infrastructure (OKE), sized to fit OCI's Always Free tier. The deployment is split into numbered stacks (`01-network` … `11-filesystem-storage-class`) that must be applied **in order** — each later stack consumes OCIDs produced by earlier ones via `terraform.tfvars`.
+OpenTofu (Terraform) IaC for a Kubernetes platform on Oracle Cloud Infrastructure (OKE), sized to fit OCI's Always Free tier. The deployment is split into numbered stacks (`01-network` … `12-origin-ca-issuer`) that must be applied **in order** — each later stack consumes OCIDs produced by earlier ones via `terraform.tfvars`.
+
+## This repository is PUBLIC
+
+This repo is published on GitHub. **Never put domain names, hostnames, project names, or other identifying values as defaults or in comments in any tracked file** (`*.tf`, `*.md`, `*.yaml`). Declare such values as required variables with **no default** and supply them only through each stack's gitignored `terraform.tfvars`. When you add a variable whose value is domain- or environment-specific, give it no default and describe it generically. Before finishing any change, sweep the working tree for identifying strings. (A domain leaked into tracked variable defaults once; it was caught pre-commit — keep it that way.)
 
 ## Common commands
 
@@ -52,7 +56,7 @@ There are no tests, linters, or build steps — this is pure IaC.
 3. `03-oke` — OKE cluster + node pool + KMS vault for external-secrets; outputs `oke_external_secrets_vault_ocid`
 4. `04-dns` — OCI DNS zones
 5. `05-vpn` — OpenVPN instance (optional automated path; the manual marketplace path in README is the default)
-6. `06-cert-manager` → `07-nginx-gateway` → `08-external-dns` → `09-external-secrets` → `10-gitlab-agent` → `11-filesystem-storage-class` — Helm/Kubernetes workloads applied via the Helm + kubernetes Terraform providers (require kubeconfig + VPN reachability to the private API endpoint)
+6. `06-cert-manager` → `07-nginx-gateway` → `08-external-dns` → `09-external-secrets` → `10-gitlab-agent` → `11-filesystem-storage-class` → `12-origin-ca-issuer` — Helm/Kubernetes workloads applied via the Helm + kubernetes Terraform providers (require kubeconfig + VPN reachability to the private API endpoint). `12-origin-ca-issuer` is optional and depends on `07` (writes the origin cert Secret into the gateway namespace) and `09` (reads the Cloudflare Origin CA token from OCI Vault via the `oci-secret-store` ClusterSecretStore).
 
 **Secret handling.** `.gitignore` excludes `*.tfvars`, `backend.tf`, `.keys/`, and `*.tfstate*`. That means:
 - `terraform.tfvars` and `backend.tf` in each stack are local-only and contain real OCIDs / GitLab tokens / etc. Never commit them. `backend.tf.template` shows the supported backend shapes.
@@ -60,6 +64,8 @@ There are no tests, linters, or build steps — this is pure IaC.
 - When adding a new stack, also create its own `backend.tf` (gitignored) and `terraform.tfvars` (gitignored).
 
 **Two-phase apply for `09-external-secrets`.** The Taskfile first runs `tofu apply -exclude="module.external-secrets.kubernetes_manifest.oci_secret_store"` and then a second unrestricted `tofu apply`. This is intentional: the `ClusterSecretStore` CRD doesn't exist until the External Secrets Operator chart is installed, so the manifest must be applied on a second pass. Preserve this pattern when editing that task.
+
+**Two-phase apply for `12-origin-ca-issuer`.** Same pattern, same reason. The Cloudflare origin-ca-issuer Helm chart does not ship its CRDs, and the `ClusterOriginIssuer`/`Certificate`/`ExternalSecret` custom resources can't be planned until their CRDs exist. `task oci-platform:install-origin-ca-issuer` first runs `tofu apply` with `-exclude` on `module.origin-ca-issuer.kubernetes_manifest.{origin_ca_token,cluster_origin_issuer,origin_certificate}` (installs namespace + CRDs + chart), then a second unrestricted `tofu apply` (creates the CRs). Preserve this two-pass structure when editing that task. Note: `modules/origin-ca-issuer` uses `data "http"` (needs the `hashicorp/http` provider, already wired into `12-origin-ca-issuer`) to fetch the issuer CRDs at plan time. `modules/network`'s shared Load Balancer NSG deliberately keeps its world-open `:443` ingress rule — a Cloudflare-only firewall lockdown was considered and not adopted, for LB flexibility (founder decision, 2026-07-18).
 
 **Filesystem storage stack (`11`).** Creates a single shared FSS mount target up front and passes its OCID into the `StorageClass` so dynamically provisioned PVCs reuse it instead of spawning new mount targets per PVC. Requires the `oke-fss-csi-policy` from `02-identity` (re-apply `02-identity` if upgrading from an older state) and `mount_target_subnet_ocid` set to the `subnet_ids.fss_mount_target` output from `01-network`.
 
