@@ -74,6 +74,8 @@ variable "allow_volume_expansion" {
 }
 
 locals {
+  storage_provisioner = "fss.csi.oraclecloud.com"
+
   optional_parameters = {
     compartmentOcid                                      = var.compartment_ocid
     kmsKeyOcid                                           = var.kms_key_ocid
@@ -96,16 +98,32 @@ locals {
   )
 }
 
+# The API server rejects updates to a StorageClass's provisioner, parameters,
+# reclaimPolicy and volumeBindingMode. The provider plans them as in-place
+# updates, which fail at apply time, so changing one must force a replacement.
+resource "terraform_data" "immutable_fields" {
+  input = {
+    parameters          = local.parameters
+    reclaim_policy      = var.reclaim_policy
+    storage_provisioner = local.storage_provisioner
+    volume_binding_mode = var.volume_binding_mode
+  }
+}
+
 resource "kubernetes_storage_class_v1" "filesystem_storage_class" {
   metadata {
     name = var.name
   }
 
-  storage_provisioner    = "fss.csi.oraclecloud.com"
+  storage_provisioner    = local.storage_provisioner
   parameters             = local.parameters
   reclaim_policy         = var.reclaim_policy
   volume_binding_mode    = var.volume_binding_mode
   allow_volume_expansion = var.allow_volume_expansion
+
+  lifecycle {
+    replace_triggered_by = [terraform_data.immutable_fields]
+  }
 }
 
 output "name" {

@@ -144,3 +144,11 @@ tasks:
           -exclude="module.origin-ca-issuer.kubernetes_manifest.cluster_origin_issuer" \
           -exclude="module.origin-ca-issuer.kubernetes_manifest.origin_certificate"
         tofu apply
+
+  oci-platform:install-block-storage-class:
+    desc: "Step 13. Install OCI Block Volume storage class"
+    dir: "13-block-storage-class"
+    cmds:
+      - echo "Installing OCI Block Volume storage class..."
+      - tofu init
+      - tofu apply
