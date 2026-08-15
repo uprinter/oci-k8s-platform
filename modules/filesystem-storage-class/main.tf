@@ -96,6 +96,17 @@ locals {
   )
 }
 
+# The API server rejects updates to a StorageClass's provisioner, parameters,
+# reclaimPolicy and volumeBindingMode. The provider plans them as in-place
+# updates, which fail at apply time, so changing one must force a replacement.
+resource "terraform_data" "immutable_fields" {
+  input = {
+    parameters          = local.parameters
+    reclaim_policy      = var.reclaim_policy
+    volume_binding_mode = var.volume_binding_mode
+  }
+}
+
 resource "kubernetes_storage_class_v1" "filesystem_storage_class" {
   metadata {
     name = var.name
@@ -106,6 +117,10 @@ resource "kubernetes_storage_class_v1" "filesystem_storage_class" {
   reclaim_policy         = var.reclaim_policy
   volume_binding_mode    = var.volume_binding_mode
   allow_volume_expansion = var.allow_volume_expansion
+
+  lifecycle {
+    replace_triggered_by = [terraform_data.immutable_fields]
+  }
 }
 
 output "name" {

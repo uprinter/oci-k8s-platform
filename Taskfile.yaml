@@ -132,6 +132,14 @@ tasks:
       - tofu init
       - tofu apply
 
+  oci-platform:install-block-storage-class:
+    desc: "Step 13. Install OCI Block Volume storage class"
+    dir: "13-block-storage-class"
+    cmds:
+      - echo "Installing OCI Block Volume storage class..."
+      - tofu init
+      - tofu apply
+
   oci-platform:install-origin-ca-issuer:
     desc: "Step 12. Install Cloudflare Origin CA issuer (two-phase apply)"
     dir: "12-origin-ca-issuer"
