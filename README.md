@@ -144,6 +144,20 @@ task oci-platform:install-external-dns
 task oci-platform:install-external-secrets
 ```
 
+> **Stale-looking secret name — do not "fix" it.** The OCI Vault entry
+> `observing-planner-umami-secrets` (consumed here via `oci-secret-store`) now backs the
+> standalone `umami` ArgoCD Application in `uprinter/cicd` (`apps/umami/`), not
+> `observing-planner`. This is historical, not orphaned — the secret is live and in active
+> use. **Do not rename, recreate, or delete it**: it is consumed wholesale via
+> `dataFrom.extract` and holds `APP_SECRET` (Umami's visitor-identity salt) alongside a
+> namespace-pinned `DATABASE_URL`, so a rename risks silent, unrecoverable analytics-identity
+> corruption and a Postgres resolution failure. Full rationale:
+> `uprinter/cicd` → `docs/adr/0001-extract-umami-to-standalone-argocd-app.md`, **Amendment
+> A1**. A rename may be re-proposed, but only as its own standalone change, never folded into
+> an unrelated cleanup. No module in this repo manages this secret's *contents* — it's
+> provisioned via `03-oke` (the vault) and consumed here via `09-external-secrets`
+> (`oci-secret-store`); this note is informational only.
+
 #### Step 6.5. Deploy GitLab Agent
 
 ```bash
