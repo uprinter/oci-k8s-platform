@@ -165,21 +165,7 @@ Before applying it:
 - This stack now creates one shared mount target up front and passes its `mountTargetOcid` into the StorageClass, so dynamically provisioned PVCs reuse the same mount target instead of creating new ones.
 - Configure the File Storage network security rules for the worker nodes and mount target as described in Oracle's manual: https://docs.oracle.com/en-us/iaas/Content/ContEng/Tasks/contengcreatingpersistentvolumeclaim_Provisioning_PVCs_on_FSS.htm
 
-#### Step 6.7. Deploy OCI Block Volume StorageClass
-
-```bash
-task oci-platform:install-block-storage-class
-```
-
-Creates a Kubernetes `StorageClass` backed by the OCI Block Volume CSI driver (`blockvolume.csi.oraclecloud.com`) with `reclaimPolicy: Retain`, and annotates it as the cluster default so that a PVC created without an explicit `storageClassName` gets a volume that survives PVC deletion.
-
-Notes:
-
-- A `StorageClass`'s `reclaimPolicy` is immutable and is read only at provisioning time. Changing it therefore requires a new class (or a delete-and-recreate), and it has no effect on already-provisioned `PersistentVolume`s — those carry their own copy of the field.
-- The block volume class shipped by the managed control plane is left in place, untouched, as the explicit opt-in for genuinely disposable volumes. This stack only patches its `storageclass.kubernetes.io/is-default-class` annotation to `false` via `demote_storage_class_name`, so the cluster has exactly one default class.
-- The control plane's CSI addon may reconcile that annotation back. After applying, verify with `kubectl get sc` that exactly one class is marked `(default)`, and re-check after cluster or addon upgrades.
-
-#### Step 6.8. Deploy Cloudflare Origin CA Issuer (optional)
+#### Step 6.7. Deploy Cloudflare Origin CA Issuer (optional)
 
 ```bash
 task oci-platform:install-origin-ca-issuer
@@ -197,3 +183,18 @@ Before applying it:
 - The origin certificate is intentionally named identically to its target Secret and carries no owner reference, so cert-manager's Gateway shim detects it and does not issue a competing certificate for the same listener.
 
 > The shared Load Balancer NSG (`modules/network`) intentionally keeps its world-open `:443` ingress rule — a Cloudflare-only firewall lockdown was considered and deliberately not adopted, to keep the LB flexible for non-Cloudflare-fronted traffic. The origin is reachable directly, not only through Cloudflare's proxy; that tradeoff is a conscious choice, not an oversight.
+
+#### Step 6.8. Deploy OCI Block Volume StorageClass
+
+```bash
+task oci-platform:install-block-storage-class
+```
+
+Creates a Kubernetes `StorageClass` backed by the OCI Block Volume CSI driver (`blockvolume.csi.oraclecloud.com`) with `reclaimPolicy: Retain`, and annotates it as the cluster default so that a PVC created without an explicit `storageClassName` gets a volume that survives PVC deletion.
+
+Notes:
+
+- A `StorageClass`'s `reclaimPolicy` is immutable and is read only at provisioning time. Changing it therefore requires a new class (or a delete-and-recreate), and it has no effect on already-provisioned `PersistentVolume`s — those carry their own copy of the field.
+- The block volume class shipped by the managed control plane is left in place, untouched, as the explicit opt-in for genuinely disposable volumes. This stack only patches its `storageclass.kubernetes.io/is-default-class` annotation to `false` via `demote_storage_class_name`, so the cluster has exactly one default class.
+- The control plane's CSI addon may reconcile that annotation back. After applying, verify with `kubectl get sc` that exactly one class is marked `(default)`, and re-check after cluster or addon upgrades.
+- Destroying this stack restores the demoted class's default-class annotation instead of just dropping the key, so a teardown does not leave the cluster with no default class. That restore shells out to `kubectl`, so `kubectl` must be on `PATH` and `k8s_context` must name a reachable context at destroy time.

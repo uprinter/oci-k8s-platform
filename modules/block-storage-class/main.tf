@@ -45,8 +45,42 @@ variable "demote_storage_class_name" {
   default     = null
 }
 
+variable "kubectl_context" {
+  description = "kubectl context used by the destroy-time restore of the demoted class's default-class annotation. Required when demote_storage_class_name is set."
+  type        = string
+  default     = null
+}
+
 locals {
   default_class_annotation = "storageclass.kubernetes.io/is-default-class"
+}
+
+## Destroying kubernetes_annotations below removes the annotation key it manages
+## rather than restoring the value it overwrote, which would leave the cluster
+## with no default storage class at all. This resource is destroyed after it
+## (the dependency is inverted on purpose) and puts the value back.
+resource "terraform_data" "restored_default_storage_class" {
+  count = var.demote_storage_class_name == null ? 0 : 1
+
+  # Destroy-time provisioners may only reference self, so the values they need
+  # have to be carried in state rather than read from variables.
+  input = {
+    annotation         = local.default_class_annotation
+    kubectl_context    = var.kubectl_context
+    storage_class_name = var.demote_storage_class_name
+  }
+
+  lifecycle {
+    precondition {
+      condition     = var.kubectl_context != null
+      error_message = "kubectl_context must be set when demote_storage_class_name is set, otherwise the demotion cannot be undone on destroy."
+    }
+  }
+
+  provisioner "local-exec" {
+    when    = destroy
+    command = "kubectl --context ${self.output.kubectl_context} annotate --overwrite storageclass ${self.output.storage_class_name} ${self.output.annotation}=true"
+  }
 }
 
 resource "kubernetes_annotations" "demoted_default_storage_class" {
@@ -65,6 +99,8 @@ resource "kubernetes_annotations" "demoted_default_storage_class" {
 
   # Takes ownership of this single annotation from the field manager that set it.
   force = true
+
+  depends_on = [terraform_data.restored_default_storage_class]
 }
 
 # The API server rejects updates to a StorageClass's provisioner, parameters,

@@ -30,7 +30,7 @@ task oci-platform:install-external-dns            # Step 6.3 (injects DNS privat
 task oci-platform:install-external-secrets        # Step 6.4 (two-phase apply — see below)
 task oci-platform:install-gitlab-agent            # Step 6.5
 task oci-platform:install-filesystem-storage-class # Step 6.6
-task oci-platform:install-block-storage-class     # Step 6.7
+task oci-platform:install-block-storage-class     # Step 6.8
 ```
 
 Direct OpenTofu use inside a stack:
@@ -70,7 +70,7 @@ There are no tests, linters, or build steps — this is pure IaC.
 
 **Filesystem storage stack (`11`).** Creates a single shared FSS mount target up front and passes its OCID into the `StorageClass` so dynamically provisioned PVCs reuse it instead of spawning new mount targets per PVC. Requires the `oke-fss-csi-policy` from `02-identity` (re-apply `02-identity` if upgrading from an older state) and `mount_target_subnet_ocid` set to the `subnet_ids.fss_mount_target` output from `01-network`. Its `reclaim_policy` is `Retain`; because a `StorageClass`'s reclaim policy is immutable, changing it plans a delete-and-recreate of the class, which does not affect any already-provisioned volume.
 
-**Block storage stack (`13`).** Creates a Block Volume CSI `StorageClass` with `reclaimPolicy: Retain` and makes it the cluster default. The control-plane-created block volume class is not adopted or recreated — only its `storageclass.kubernetes.io/is-default-class` annotation is patched to `false` (via `demote_storage_class_name`, using `kubernetes_annotations` with `force = true`), so it remains available as the explicit opt-in for disposable volumes. The CSI addon can reconcile that annotation back; after every apply, and after cluster/addon upgrades, verify with `kubectl get sc` that exactly one class is marked `(default)`.
+**Block storage stack (`13`).** Creates a Block Volume CSI `StorageClass` with `reclaimPolicy: Retain` and makes it the cluster default. The control-plane-created block volume class is not adopted or recreated — only its `storageclass.kubernetes.io/is-default-class` annotation is patched to `false` (via `demote_storage_class_name`, using `kubernetes_annotations` with `force = true`), so it remains available as the explicit opt-in for disposable volumes. The CSI addon can reconcile that annotation back; after every apply, and after cluster/addon upgrades, verify with `kubectl get sc` that exactly one class is marked `(default)`. Destroying the stack restores the demoted class's annotation via a destroy-time `local-exec` on `terraform_data.restored_default_storage_class` — `kubernetes_annotations` would otherwise only drop the key and leave the cluster with no default class. The dependency between those two resources is deliberately inverted so the restore runs last on destroy; it shells out to `kubectl`, which must be on `PATH` at destroy time.
 
 **Provider auth.** All OCI providers use `auth = "SecurityToken"` with `config_file_profile = "DEFAULT"` — run `task oci:login` (`oci session authenticate`) before any apply. Region defaults to `eu-frankfurt-1` in `terraform.tfvars`.
 

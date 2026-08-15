@@ -24,6 +24,7 @@ module "block_storage_class" {
   allow_volume_expansion    = var.allow_volume_expansion
   is_default_class          = var.is_default_class
   demote_storage_class_name = var.demote_storage_class_name
+  kubectl_context           = var.k8s_context
 }
 
 output "storage_class_name" {
