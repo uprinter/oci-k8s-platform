@@ -198,3 +198,18 @@ Notes:
 - The block volume class shipped by the managed control plane is left in place, untouched, as the explicit opt-in for genuinely disposable volumes. This stack only patches its `storageclass.kubernetes.io/is-default-class` annotation to `false` via `demote_storage_class_name`, so the cluster has exactly one default class.
 - The control plane's CSI addon may reconcile that annotation back. After applying, verify with `kubectl get sc` that exactly one class is marked `(default)`, and re-check after cluster or addon upgrades.
 - Destroying this stack restores the demoted class's default-class annotation instead of just dropping the key, so a teardown does not leave the cluster with no default class. That restore shells out to `kubectl`, so `kubectl` must be on `PATH` and `k8s_context` must name a reachable context at destroy time.
+
+#### Step 6.9. Deploy metrics-server
+
+```bash
+task oci-platform:install-metrics-server
+```
+
+Installs metrics-server into `kube-system`, which registers the `metrics.k8s.io` aggregated API. OKE does not ship it, so without this stack `kubectl top node` / `kubectl top pods` fail with `Metrics API not available`, and any `HorizontalPodAutoscaler` cannot read CPU or memory.
+
+Notes:
+
+- Runs with `--kubelet-insecure-tls`. OKE kubelets serve a node-local self-signed certificate rather than one issued by the cluster CA (`serverTLSBootstrap` is off and no kubelet-serving CSRs are issued), so there is nothing for metrics-server to verify the kubelet against; without the flag every scrape fails with `x509: certificate signed by unknown authority`.
+- The chart's default `--kubelet-preferred-address-types` already prefers `InternalIP`, which is what OKE nodes publish, so no override is needed.
+- The container has a memory limit but deliberately no CPU limit — CPU throttling stalls the scrape loop and leaves gaps in the reported metrics.
+- Metrics are in-memory and short-lived; this provides live utilization only, not historical trend data. A restart resets it, and it is not a substitute for Prometheus.

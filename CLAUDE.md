@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-OpenTofu (Terraform) IaC for a Kubernetes platform on Oracle Cloud Infrastructure (OKE), sized to fit OCI's Always Free tier. The deployment is split into numbered stacks (`01-network` … `12-origin-ca-issuer`) that must be applied **in order** — each later stack consumes OCIDs produced by earlier ones via `terraform.tfvars`.
+OpenTofu (Terraform) IaC for a Kubernetes platform on Oracle Cloud Infrastructure (OKE), sized to fit OCI's Always Free tier. The deployment is split into numbered stacks (`01-network` … `14-metrics-server`) that must be applied **in order** — each later stack consumes OCIDs produced by earlier ones via `terraform.tfvars`.
 
 ## This repository is PUBLIC
 
@@ -31,6 +31,7 @@ task oci-platform:install-external-secrets        # Step 6.4 (two-phase apply �
 task oci-platform:install-gitlab-agent            # Step 6.5
 task oci-platform:install-filesystem-storage-class # Step 6.6
 task oci-platform:install-block-storage-class     # Step 6.8
+task oci-platform:install-metrics-server          # Step 6.9
 ```
 
 Direct OpenTofu use inside a stack:
@@ -57,7 +58,7 @@ There are no tests, linters, or build steps — this is pure IaC.
 3. `03-oke` — OKE cluster + node pool + KMS vault for external-secrets; outputs `oke_external_secrets_vault_ocid`
 4. `04-dns` — OCI DNS zones
 5. `05-vpn` — OpenVPN instance (optional automated path; the manual marketplace path in README is the default)
-6. `06-cert-manager` → `07-nginx-gateway` → `08-external-dns` → `09-external-secrets` → `10-gitlab-agent` → `11-filesystem-storage-class` → `12-origin-ca-issuer` → `13-block-storage-class` — Helm/Kubernetes workloads applied via the Helm + kubernetes Terraform providers (require kubeconfig + VPN reachability to the private API endpoint). `12-origin-ca-issuer` is optional and depends on `07` (writes the origin cert Secret into the gateway namespace) and `09` (reads the Cloudflare Origin CA token from OCI Vault via the `oci-secret-store` ClusterSecretStore).
+6. `06-cert-manager` → `07-nginx-gateway` → `08-external-dns` → `09-external-secrets` → `10-gitlab-agent` → `11-filesystem-storage-class` → `12-origin-ca-issuer` → `13-block-storage-class` → `14-metrics-server` — Helm/Kubernetes workloads applied via the Helm + kubernetes Terraform providers (require kubeconfig + VPN reachability to the private API endpoint). `12-origin-ca-issuer` is optional and depends on `07` (writes the origin cert Secret into the gateway namespace) and `09` (reads the Cloudflare Origin CA token from OCI Vault via the `oci-secret-store` ClusterSecretStore).
 
 **Secret handling.** `.gitignore` excludes `*.tfvars`, `backend.tf`, `.keys/`, and `*.tfstate*`. That means:
 - `terraform.tfvars` and `backend.tf` in each stack are local-only and contain real OCIDs / GitLab tokens / etc. Never commit them. `backend.tf.template` shows the supported backend shapes.
@@ -71,6 +72,8 @@ There are no tests, linters, or build steps — this is pure IaC.
 **Filesystem storage stack (`11`).** Creates a single shared FSS mount target up front and passes its OCID into the `StorageClass` so dynamically provisioned PVCs reuse it instead of spawning new mount targets per PVC. Requires the `oke-fss-csi-policy` from `02-identity` (re-apply `02-identity` if upgrading from an older state) and `mount_target_subnet_ocid` set to the `subnet_ids.fss_mount_target` output from `01-network`. Its `reclaim_policy` is `Retain`; because a `StorageClass`'s reclaim policy is immutable, changing it plans a delete-and-recreate of the class, which does not affect any already-provisioned volume.
 
 **Block storage stack (`13`).** Creates a Block Volume CSI `StorageClass` with `reclaimPolicy: Retain` and makes it the cluster default. The control-plane-created block volume class is not adopted or recreated — only its `storageclass.kubernetes.io/is-default-class` annotation is patched to `false` (via `demote_storage_class_name`, using `kubernetes_annotations` with `force = true`), so it remains available as the explicit opt-in for disposable volumes. The CSI addon can reconcile that annotation back; after every apply, and after cluster/addon upgrades, verify with `kubectl get sc` that exactly one class is marked `(default)`. Destroying the stack restores the demoted class's annotation via a destroy-time `local-exec` on `terraform_data.restored_default_storage_class` — `kubernetes_annotations` would otherwise only drop the key and leave the cluster with no default class. The dependency between those two resources is deliberately inverted so the restore runs last on destroy; it shells out to `kubectl`, which must be on `PATH` at destroy time.
+
+**Metrics-server stack (`14`).** Installs metrics-server into `kube-system`, providing the `metrics.k8s.io` API that `kubectl top` and any HPA depend on — OKE does not ship it. It runs with `--kubelet-insecure-tls` because OKE kubelets serve a node-local self-signed certificate (`/var/lib/kubelet/pki/tls.pem`) rather than one issued by the cluster CA: `serverTLSBootstrap` is off and no kubelet-serving CSRs are issued, so there is no CA for metrics-server to verify against. Without that flag every scrape fails `x509: unknown authority`. The container has no CPU limit on purpose — CFS throttling stalls the scrape loop and puts gaps in the metrics.
 
 **Provider auth.** All OCI providers use `auth = "SecurityToken"` with `config_file_profile = "DEFAULT"` — run `task oci:login` (`oci session authenticate`) before any apply. Region defaults to `eu-frankfurt-1` in `terraform.tfvars`.
 
