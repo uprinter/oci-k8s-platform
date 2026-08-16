@@ -45,15 +45,15 @@ variable "node_shape" {
 }
 
 variable "node_ocpus" {
-  description = "Number of OCPUs per node"
+  description = "Number of OCPUs per node. Together with node_memory_in_gbs this sits at the Always Free Ampere A1 ceiling (4 OCPU / 24 GB per tenancy)."
   type        = number
-  default     = 8
+  default     = 4
 }
 
 variable "node_memory_in_gbs" {
   description = "Memory in GBs per node"
   type        = number
-  default     = 27
+  default     = 24
 }
 
 variable "node_count" {
