@@ -16,6 +16,24 @@ variable "crd_version" {
   default     = "v0.14.4"
 }
 
+variable "cpu_request" {
+  description = "CPU request for the controller. The chart defaults to a full OCPU, which reserves far more than this controller uses."
+  type        = string
+  default     = "50m"
+}
+
+variable "memory_request" {
+  description = "Memory request for the controller."
+  type        = string
+  default     = "64Mi"
+}
+
+variable "memory_limit" {
+  description = "Memory limit for the controller."
+  type        = string
+  default     = "128Mi"
+}
+
 variable "request_type" {
   description = "Origin CA certificate key type: OriginRSA or OriginECC."
   type        = string
@@ -104,6 +122,18 @@ resource "helm_release" "origin_ca_issuer" {
     {
       name  = "controller.clusterResourceNamespace"
       value = var.namespace
+    },
+    {
+      name  = "controller.resources.requests.cpu"
+      value = var.cpu_request
+    },
+    {
+      name  = "controller.resources.requests.memory"
+      value = var.memory_request
+    },
+    {
+      name  = "controller.resources.limits.memory"
+      value = var.memory_limit
     }
   ]
 
