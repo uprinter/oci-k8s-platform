@@ -152,3 +152,11 @@ tasks:
       - echo "Installing OCI Block Volume storage class..."
       - tofu init
       - tofu apply
+
+  oci-platform:install-metrics-server:
+    desc: "Step 14. Install metrics-server (Metrics API for kubectl top / HPA)"
+    dir: "14-metrics-server"
+    cmds:
+      - echo "Installing metrics-server..."
+      - tofu init
+      - tofu apply
