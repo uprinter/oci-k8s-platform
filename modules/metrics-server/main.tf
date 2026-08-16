@@ -40,12 +40,6 @@ variable "memory_limit" {
   default     = "200Mi"
 }
 
-variable "preemptible_toleration_key" {
-  description = "Node taint key tolerated so the pod can schedule onto preemptible OKE nodes. Null disables the toleration."
-  type        = string
-  default     = "oci.oraclecloud.com/oke-is-preemptible"
-}
-
 resource "helm_release" "metrics_server" {
   name             = "metrics-server"
   repository       = "https://kubernetes-sigs.github.io/metrics-server/"
@@ -71,12 +65,6 @@ resource "helm_release" "metrics_server" {
         memory = var.memory_limit
       }
     }
-
-    tolerations = var.preemptible_toleration_key == null ? [] : [{
-      key      = var.preemptible_toleration_key
-      operator = "Exists"
-      effect   = "NoSchedule"
-    }]
   })]
 }
 

@@ -44,9 +44,3 @@ variable "memory_limit" {
   type        = string
   default     = "200Mi"
 }
-
-variable "preemptible_toleration_key" {
-  description = "Node taint key tolerated so the pod can schedule onto preemptible nodes. Null disables the toleration."
-  type        = string
-  default     = "oci.oraclecloud.com/oke-is-preemptible"
-}

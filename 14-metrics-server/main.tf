@@ -18,14 +18,13 @@ provider "helm" {
 module "metrics_server" {
   source = "../modules/metrics-server"
 
-  namespace                  = var.namespace
-  chart_version              = var.chart_version
-  replicas                   = var.replicas
-  kubelet_insecure_tls       = var.kubelet_insecure_tls
-  cpu_request                = var.cpu_request
-  memory_request             = var.memory_request
-  memory_limit               = var.memory_limit
-  preemptible_toleration_key = var.preemptible_toleration_key
+  namespace            = var.namespace
+  chart_version        = var.chart_version
+  replicas             = var.replicas
+  kubelet_insecure_tls = var.kubelet_insecure_tls
+  cpu_request          = var.cpu_request
+  memory_request       = var.memory_request
+  memory_limit         = var.memory_limit
 }
 
 output "namespace" {
