@@ -10,6 +10,16 @@ OpenTofu (Terraform) IaC for a Kubernetes platform on Oracle Cloud Infrastructur
 
 This repo is published on GitHub. **Never put domain names, hostnames, project names, or other identifying values as defaults or in comments in any tracked file** (`*.tf`, `*.md`, `*.yaml`). Declare such values as required variables with **no default** and supply them only through each stack's gitignored `terraform.tfvars`. When you add a variable whose value is domain- or environment-specific, give it no default and describe it generically. Before finishing any change, sweep the working tree for identifying strings. (A domain leaked into tracked variable defaults once; it was caught pre-commit — keep it that way.)
 
+**The rule governs a module's existence, name and prose — not only its values.** Parameterising every value out is not sufficient. A stack directory, resource name, variable description or comment that reveals *what product* the infrastructure serves is itself the leak, even with no identifying value anywhere in the tree. Apply this test to anything you add here:
+
+> *Could a stranger reading only this repo learn that a specific product exists and what it does?* It must be **no**.
+
+If a module cannot be named and described without revealing what product it serves, it does not belong in this repo **at all** — do not try to scrub it into compliance, and do not degrade a load-bearing comment to buy secrecy. Conversely, a module that is genuinely a reusable infrastructure primitive stays here even if one product is currently its only consumer.
+
+**Where product-specific stacks go instead:** a private, product-scoped IaC repo — each product gets its own sibling private repo rather than co-tenanting. Those repos hold product-specific *instantiations* (the what and why) and may name the product freely; this repo holds generic, reusable module *definitions* (the how). A private stack may consume a module from here by git source pinned to a full 40-character commit SHA; that is module sourcing, not state sharing, and introduces no `terraform_remote_state`.
+
+The rule and the full boundary table are recorded in an internal architecture decision record, kept privately alongside the product this rule originated from.
+
 ## Common commands
 
 All operations are driven through `Taskfile.yaml` using [Task](https://taskfile.dev/). The tasks `cd` into the correct numbered directory and run `tofu init && tofu apply` with the right variables.
