@@ -17,6 +17,16 @@ tasks:
       - openssl rsa -pubout -outform DER -in .keys/dns/oci_api_key.pem | openssl md5 -c | sed 's/^.*= //' > .keys/dns/fingerprint.txt
       - echo "Keys generated in .keys/dns/ directory"
 
+  oci-platform:generate-ci-keys:
+    desc: "Step 0. Generate key pair for the ci-terraform technical user"
+    cmds:
+      - echo "Generating key pair for the ci-terraform technical user"
+      - rm -rf ./.keys/ci
+      - mkdir -p ./.keys/ci
+      - openssl genrsa -out .keys/ci/ci-terraform.pem 2048
+      - openssl rsa -pubout -in .keys/ci/ci-terraform.pem -out .keys/ci/ci-terraform_public.pem
+      - echo "Keys generated in .keys/ci/ directory"
+
   oci-platform:generate-ssh-keys:
     desc: "Step 0. Generate SSH key pair for OKE worker nodes"
     cmds:
@@ -41,8 +51,11 @@ tasks:
       - echo "Installing identity layer..."
       - |
         PUBLIC_KEY=$(cat ../.keys/dns/oci_api_key_public.pem)
+        CI_PUBLIC_KEY=$(cat ../.keys/ci/ci-terraform_public.pem)
         tofu init
-        tofu apply -var="oci_api_public_key=$PUBLIC_KEY"
+        tofu apply \
+          -var="oci_api_public_key=$PUBLIC_KEY" \
+          -var="ci_terraform_public_key=$CI_PUBLIC_KEY"
 
   oci-platform:install-oke:
     desc: "Step 3. Install OKE cluster"
