@@ -6,16 +6,16 @@ tasks:
     cmds:
       - oci session authenticate
 
-  oci-platform:generate-dns-keys:
-    desc: "Step 0. Generate key pair for ExternalDNS"
+  oci-platform:generate-oci-keys:
+    desc: "Step 0. Generate the shared OCI API key pair for ExternalDNS and ExternalSecrets"
     cmds:
-      - echo "Generating key pair for ExternalDNS"
-      - rm -rf ./.keys/dns
-      - mkdir -p ./.keys/dns
-      - openssl genrsa -out .keys/dns/oci_api_key.pem 2048
-      - openssl rsa -pubout -in .keys/dns/oci_api_key.pem -out .keys/dns/oci_api_key_public.pem
-      - openssl rsa -pubout -outform DER -in .keys/dns/oci_api_key.pem | openssl md5 -c | sed 's/^.*= //' > .keys/dns/fingerprint.txt
-      - echo "Keys generated in .keys/dns/ directory"
+      - echo "Generating shared OCI API key pair for ExternalDNS and ExternalSecrets"
+      - rm -rf ./.keys/oci
+      - mkdir -p ./.keys/oci
+      - openssl genrsa -out .keys/oci/oci_api_key.pem 2048
+      - openssl rsa -pubout -in .keys/oci/oci_api_key.pem -out .keys/oci/oci_api_key_public.pem
+      - openssl rsa -pubout -outform DER -in .keys/oci/oci_api_key.pem | openssl md5 -c | sed 's/^.*= //' > .keys/oci/fingerprint.txt
+      - echo "Keys generated in .keys/oci/ directory"
 
   oci-platform:generate-ci-keys:
     desc: "Step 0. Generate key pair for the ci-terraform technical user"
@@ -50,7 +50,7 @@ tasks:
     cmds:
       - echo "Installing identity layer..."
       - |
-        PUBLIC_KEY=$(cat ../.keys/dns/oci_api_key_public.pem)
+        PUBLIC_KEY=$(cat ../.keys/oci/oci_api_key_public.pem)
         CI_PUBLIC_KEY=$(cat ../.keys/ci/ci-terraform_public.pem)
         tofu init
         tofu apply \
@@ -106,8 +106,8 @@ tasks:
     cmds:
       - echo "Installing ExternalDNS..."
       - |
-        PRIVATE_KEY=$(cat ../.keys/dns/oci_api_key.pem)
-        FINGERPRINT=$(cat ../.keys/dns/fingerprint.txt)
+        PRIVATE_KEY=$(cat ../.keys/oci/oci_api_key.pem)
+        FINGERPRINT=$(cat ../.keys/oci/fingerprint.txt)
         tofu init
         tofu apply \
           -var="oci_api_private_key=$PRIVATE_KEY" \
@@ -119,8 +119,8 @@ tasks:
     cmds:
       - echo "Installing ExternalSecrets..."
       - |
-        PRIVATE_KEY=$(cat ../.keys/dns/oci_api_key.pem)
-        FINGERPRINT=$(cat ../.keys/dns/fingerprint.txt)
+        PRIVATE_KEY=$(cat ../.keys/oci/oci_api_key.pem)
+        FINGERPRINT=$(cat ../.keys/oci/fingerprint.txt)
         tofu init
         tofu apply -exclude="module.external-secrets.kubernetes_manifest.oci_secret_store" \
           -var="oci_api_private_key=$PRIVATE_KEY" \

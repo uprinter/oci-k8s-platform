@@ -62,7 +62,7 @@ task oci-platform:install-oke
 ### Step 4. Deploy DNS Module
 
 ```bash
-task oci-platform:generate-dns-keys
+task oci-platform:generate-oci-keys
 task oci-platform:install-dns
 ```
 

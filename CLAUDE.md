@@ -27,17 +27,17 @@ All operations are driven through `Taskfile.yaml` using [Task](https://taskfile.
 ```bash
 task --list                                       # all tasks
 task oci:login                                    # OCI session auth (run first)
-task oci-platform:generate-dns-keys               # creates .keys/dns/* (consumed by 02 & 08 & 09)
+task oci-platform:generate-oci-keys               # creates .keys/oci/* (consumed by 02 & 08 & 09)
 task oci-platform:generate-ci-keys                # creates .keys/ci/* (consumed by 02-identity)
 task oci-platform:generate-ssh-keys               # creates .keys/ssh/* (consumed by 03-oke)
 task oci-platform:install-network                 # Step 1
-task oci-platform:install-identity                # Step 2 (injects DNS + CI public keys)
+task oci-platform:install-identity                # Step 2 (injects shared OCI + CI public keys)
 task oci-platform:install-oke                     # Step 3 (injects SSH public key)
 task oci-platform:install-dns                     # Step 4
 task oci-platform:install-vpn                     # Step 5 (optional — see README for manual path)
 task oci-platform:install-cert-manager            # Step 6.1 — requires VPN + kubeconfig
 task oci-platform:install-nginx-gateway           # Step 6.2
-task oci-platform:install-external-dns            # Step 6.3 (injects DNS private key + fingerprint)
+task oci-platform:install-external-dns            # Step 6.3 (injects shared OCI private key + fingerprint)
 task oci-platform:install-external-secrets        # Step 6.4 (two-phase apply — see below)
 task oci-platform:install-gitlab-agent            # Step 6.5
 task oci-platform:install-filesystem-storage-class # Step 6.6
@@ -65,7 +65,7 @@ There are no tests, linters, or build steps — this is pure IaC.
 
 **Dependency order (do not reorder):**
 1. `01-network` — VCN, subnets (worker, api, lb, pod, vpn, fss_mount_target), NSGs, gateways
-2. `02-identity` — compartments, dynamic groups, IAM policies, including the DNS user that consumes the public key from `.keys/dns/` and the `ci-terraform` technical user that consumes the one from `.keys/ci/`
+2. `02-identity` — compartments, dynamic groups, IAM policies, including the `external-dns` and `external-secrets` technical users that share the public key from `.keys/oci/` and the `ci-terraform` technical user that consumes the one from `.keys/ci/`
 3. `03-oke` — OKE cluster + node pool + KMS vault for external-secrets; outputs `oke_external_secrets_vault_ocid`
 4. `04-dns` — OCI DNS zones
 5. `05-vpn` — OpenVPN instance (optional automated path; the manual marketplace path in README is the default)
@@ -73,7 +73,7 @@ There are no tests, linters, or build steps — this is pure IaC.
 
 **Secret handling.** `.gitignore` excludes `*.tfvars`, `backend.tf`, `.keys/`, and `*.tfstate*`. That means:
 - `terraform.tfvars` and `backend.tf` in each stack are local-only and contain real OCIDs / GitLab tokens / etc. Never commit them. `backend.tf.template` shows the supported backend shapes.
-- DNS API keys, CI API keys, and SSH keys live in `.keys/dns/`, `.keys/ci/`, and `.keys/ssh/` and are injected at apply time via `-var=` from the Taskfile — never baked into tfvars.
+- The shared OCI API key (used by both the `external-dns` and `external-secrets` technical users), the CI API key, and the SSH keys live in `.keys/oci/`, `.keys/ci/`, and `.keys/ssh/` and are injected at apply time via `-var=` from the Taskfile — never baked into tfvars.
 - When adding a new stack, also create its own `backend.tf` (gitignored) and `terraform.tfvars` (gitignored).
 
 **Two-phase apply for `09-external-secrets`.** The Taskfile first runs `tofu apply -exclude="module.external-secrets.kubernetes_manifest.oci_secret_store"` and then a second unrestricted `tofu apply`. This is intentional: the `ClusterSecretStore` CRD doesn't exist until the External Secrets Operator chart is installed, so the manifest must be applied on a second pass. Preserve this pattern when editing that task.
