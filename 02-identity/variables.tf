@@ -13,6 +13,11 @@ variable "oci_api_public_key" {
   type        = string
 }
 
+variable "ci_terraform_public_key" {
+  description = "PEM public key registered as the CI technical user's API key"
+  type        = string
+}
+
 variable "technical_users_domain_url" {
   description = "Technical users domain URL"
   type        = string

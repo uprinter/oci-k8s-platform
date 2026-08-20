@@ -19,6 +19,7 @@ module "identity" {
   compartment_id                = var.root_compartment_id
   region                        = var.region
   oci_api_public_key            = var.oci_api_public_key
+  ci_terraform_public_key       = var.ci_terraform_public_key
   technical_users_domain_url    = var.technical_users_domain_url
   technical_users_domain_name   = var.technical_users_domain_name
   approved_sender_emails        = var.approved_sender_emails
@@ -42,4 +43,14 @@ output "external_dns_user_ocid" {
 output "external_secrets_user_ocid" {
   value       = module.identity.external_secrets_user_ocid
   description = "OCID of the external secrets user"
+}
+
+output "ci_terraform_user_ocid" {
+  value       = module.identity.ci_terraform_user_ocid
+  description = "OCID of the CI technical user"
+}
+
+output "ci_terraform_api_key_fingerprint" {
+  value       = module.identity.ci_terraform_api_key_fingerprint
+  description = "Fingerprint of the CI technical user's API key"
 }

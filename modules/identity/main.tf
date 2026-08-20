@@ -1,6 +1,12 @@
 variable "compartment_id" { type = string }
 variable "region" { type = string }
 variable "oci_api_public_key" { type = string }
+
+variable "ci_terraform_public_key" {
+  description = "PEM-formatted RSA public key registered as the CI technical user's API key. The matching private key is generated out-of-band and never enters state."
+  type        = string
+}
+
 variable "approved_sender_emails" {
   type    = list(string)
   default = []
@@ -206,4 +212,68 @@ resource "oci_email_sender" "approved_sender" {
   for_each       = toset(var.approved_sender_emails)
   compartment_id = var.compartment_id
   email_address  = each.value
+}
+
+resource "oci_identity_domains_user" "ci_terraform_user" {
+  idcs_endpoint = var.technical_users_domain_url
+  schemas = [
+    "urn:ietf:params:scim:schemas:core:2.0:User",
+    "urn:ietf:params:scim:schemas:oracle:idcs:extension:userState:User",
+    "urn:ietf:params:scim:schemas:oracle:idcs:extension:OCITags",
+    "urn:ietf:params:scim:schemas:oracle:idcs:extension:capabilities:User",
+    "urn:ietf:params:scim:schemas:oracle:idcs:extension:user:User"
+  ]
+  user_name = "ci-terraform"
+  name {
+    family_name = "CITerraform"
+  }
+}
+
+resource "oci_identity_domains_api_key" "ci_terraform_api_key" {
+  idcs_endpoint = var.technical_users_domain_url
+  key           = var.ci_terraform_public_key
+  schemas       = ["urn:ietf:params:scim:schemas:oracle:idcs:apikey"]
+
+  user {
+    ocid  = oci_identity_domains_user.ci_terraform_user.ocid
+    value = oci_identity_domains_user.ci_terraform_user.id
+  }
+}
+
+resource "oci_identity_domains_group" "ci_terraform_group" {
+  display_name   = "CI Terraform"
+  idcs_endpoint  = var.technical_users_domain_url
+  attribute_sets = ["all"]
+  schemas = [
+    "urn:ietf:params:scim:schemas:core:2.0:Group",
+    "urn:ietf:params:scim:schemas:oracle:idcs:extension:OCITags",
+    "urn:ietf:params:scim:schemas:oracle:idcs:extension:group:Group",
+  ]
+
+  members {
+    value = oci_identity_domains_user.ci_terraform_user.id
+    type  = "User"
+  }
+}
+
+resource "oci_identity_policy" "ci_terraform_policy" {
+  compartment_id = var.compartment_id
+  name           = "ci-terraform-policy"
+  description    = "Policy for the CI technical user that applies Object Storage and Email Delivery stacks"
+  statements = [
+    "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.ci_terraform_group.display_name}' to read objectstorage-namespaces in tenancy",
+    # PAR_MANAGE and RETENTION_RULE_* are excluded: a pre-authenticated request
+    # created on a bucket would grant object-level read, which this identity is
+    # otherwise denied.
+    "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.ci_terraform_group.display_name}' to manage buckets in compartment id ${var.compartment_id} where any {request.permission='BUCKET_INSPECT', request.permission='BUCKET_READ', request.permission='BUCKET_UPDATE', request.permission='BUCKET_CREATE', request.permission='BUCKET_DELETE'}",
+    "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.ci_terraform_group.display_name}' to manage email-family in compartment id ${var.compartment_id}"
+  ]
+}
+
+output "ci_terraform_user_ocid" {
+  value = oci_identity_domains_user.ci_terraform_user.ocid
+}
+
+output "ci_terraform_api_key_fingerprint" {
+  value = oci_identity_domains_api_key.ci_terraform_api_key.fingerprint
 }
