@@ -104,7 +104,7 @@ resource "kubernetes_manifest" "nginx_fabric_gateway_external" {
       gatewayClassName = "nginx"
       infrastructure = {
         annotations = {
-          "external-dns.alpha.kubernetes.io/hostname"                   = "*.${var.external_dns_zone}${length(var.public_dns_zone_records) > 0 ? format(",%s", join(",", var.public_dns_zone_records)) : ""}"
+          "external-dns.alpha.kubernetes.io/hostname"                   = "*.${var.external_dns_zone}"
           "service.beta.kubernetes.io/oci-load-balancer-shape"          = "flexible"
           "service.beta.kubernetes.io/oci-load-balancer-shape-flex-min" = "10"
           "service.beta.kubernetes.io/oci-load-balancer-shape-flex-max" = "50"
