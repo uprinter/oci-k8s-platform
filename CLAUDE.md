@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 OpenTofu (Terraform) IaC for a Kubernetes platform on Oracle Cloud Infrastructure (OKE), sized to fit OCI's Always Free tier. The deployment is split into numbered stacks (`01-network` … `14-metrics-server`) that must be applied **in order** — each later stack consumes OCIDs produced by earlier ones via `terraform.tfvars`.
 
+## Spec-driven development
+
+Infrastructure changes follow the repository's spec-driven workflow. Feature artifacts live under `specs/NNN-<feature-slug>/`; implementation starts only after the governing `spec.md` and, where required by the feature's size lane, `plan.md` have merged to the default branch.
+
 ## This repository is PUBLIC
 
 This repo is published on GitHub. **Never put domain names, hostnames, project names, or other identifying values as defaults or in comments in any tracked file** (`*.tf`, `*.md`, `*.yaml`). Declare such values as required variables with **no default** and supply them only through each stack's gitignored `terraform.tfvars`. When you add a variable whose value is domain- or environment-specific, give it no default and describe it generically. Before finishing any change, sweep the working tree for identifying strings. (A domain leaked into tracked variable defaults once; it was caught pre-commit — keep it that way.)
