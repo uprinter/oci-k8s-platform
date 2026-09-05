@@ -1,7 +1,7 @@
 ---
 title: "OCI VCN DNS listener — Implementation Plan"
 feature: 001-oci-dns-listener
-status: Draft
+status: Active
 size: L
 owner: lead-system-architect
 created: 2026-09-04

@@ -1,7 +1,7 @@
 ---
 title: "OCI VCN DNS listener — Tasks"
 feature: 001-oci-dns-listener
-status: Draft
+status: Active
 size: L
 owner: team-lead-coordinator
 created: 2026-09-04

@@ -1,7 +1,7 @@
 ---
 title: "OCI VCN DNS listener — Product Specification"
 feature: 001-oci-dns-listener
-status: Draft
+status: Active
 size: L
 owner: product-owner
 created: 2026-09-04
