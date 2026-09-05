@@ -7,3 +7,8 @@ variable "region" {
   description = "The OCI region to deploy resources in"
   type        = string
 }
+
+variable "dns_listener_address" {
+  description = "Private IPv4 address assigned to the VCN DNS listener"
+  type        = string
+}
