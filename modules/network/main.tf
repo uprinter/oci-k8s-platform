@@ -2,6 +2,16 @@ variable "compartment_id" {
   description = "The OCID of the compartment."
 }
 
+variable "dns_listener_address" {
+  description = "Private IPv4 address assigned to the VCN DNS listener"
+  type        = string
+
+  validation {
+    condition     = can(cidrnetmask("${var.dns_listener_address}/32"))
+    error_message = "dns_listener_address must be a valid IPv4 address."
+  }
+}
+
 data "oci_core_services" "all_services" {}
 
 resource "oci_core_vcn" "k8s_vcn" {
@@ -9,6 +19,10 @@ resource "oci_core_vcn" "k8s_vcn" {
   display_name   = "k8s_vcn"
   cidr_block     = "10.0.0.0/16"
   dns_label      = "k8svcn"
+}
+
+data "oci_core_vcn_dns_resolver_association" "k8s_vcn" {
+  vcn_id = oci_core_vcn.k8s_vcn.id
 }
 
 resource "oci_core_internet_gateway" "k8s_ig" {
@@ -225,6 +239,69 @@ resource "oci_core_network_security_group" "vpn_nsg" {
   compartment_id = var.compartment_id
   vcn_id         = oci_core_vcn.k8s_vcn.id
   display_name   = "vpn_nsg"
+}
+
+resource "oci_core_network_security_group" "dns_resolver_nsg" {
+  compartment_id = var.compartment_id
+  vcn_id         = oci_core_vcn.k8s_vcn.id
+  display_name   = "dns_resolver_nsg"
+}
+
+resource "oci_core_network_security_group_security_rule" "dns_resolver_ingress_udp" {
+  network_security_group_id = oci_core_network_security_group.dns_resolver_nsg.id
+  description               = "Allow DNS over UDP from the VPN gateway"
+  direction                 = "INGRESS"
+  protocol                  = "17" // UDP
+  source                    = oci_core_network_security_group.vpn_nsg.id
+  source_type               = "NETWORK_SECURITY_GROUP"
+  stateless                 = false
+
+  udp_options {
+    destination_port_range {
+      min = 53
+      max = 53
+    }
+  }
+}
+
+resource "oci_core_network_security_group_security_rule" "dns_resolver_ingress_tcp" {
+  network_security_group_id = oci_core_network_security_group.dns_resolver_nsg.id
+  description               = "Allow DNS over TCP from the VPN gateway"
+  direction                 = "INGRESS"
+  protocol                  = "6" // TCP
+  source                    = oci_core_network_security_group.vpn_nsg.id
+  source_type               = "NETWORK_SECURITY_GROUP"
+  stateless                 = false
+
+  tcp_options {
+    destination_port_range {
+      min = 53
+      max = 53
+    }
+  }
+}
+
+resource "oci_dns_resolver_endpoint" "vcn_listener" {
+  is_forwarding     = false
+  is_listening      = true
+  listening_address = var.dns_listener_address
+  name              = "vcn_listener"
+  nsg_ids           = [oci_core_network_security_group.dns_resolver_nsg.id]
+  resolver_id       = data.oci_core_vcn_dns_resolver_association.k8s_vcn.dns_resolver_id
+  scope             = "PRIVATE"
+  subnet_id         = oci_core_subnet.k8s_worker_subnet.id
+
+  depends_on = [
+    oci_core_network_security_group_security_rule.dns_resolver_ingress_tcp,
+    oci_core_network_security_group_security_rule.dns_resolver_ingress_udp,
+  ]
+
+  lifecycle {
+    precondition {
+      condition     = cidrcontains(oci_core_subnet.k8s_worker_subnet.cidr_block, var.dns_listener_address)
+      error_message = "dns_listener_address must belong to the private worker subnet."
+    }
+  }
 }
 
 
@@ -935,4 +1012,8 @@ output "nsg_ids" {
     pod    = oci_core_network_security_group.k8s_pod_nsg.id
     vpn    = oci_core_network_security_group.vpn_nsg.id
   }
+}
+
+output "dns_listener_address" {
+  value = oci_dns_resolver_endpoint.vcn_listener.listening_address
 }
