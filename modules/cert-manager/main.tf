@@ -4,10 +4,17 @@ resource "kubernetes_namespace" "cert_manager" {
   }
 }
 
+variable "chart_version" {
+  description = "cert-manager Helm chart version (https://charts.jetstack.io)."
+  type        = string
+  default     = "v1.19.1"
+}
+
 resource "helm_release" "cert_manager" {
   name             = "cert-manager"
   repository       = "https://charts.jetstack.io"
   chart            = "cert-manager"
+  version          = var.chart_version
   namespace        = kubernetes_namespace.cert_manager.metadata[0].name
   create_namespace = false
 
