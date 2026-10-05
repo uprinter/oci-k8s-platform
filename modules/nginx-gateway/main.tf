@@ -39,10 +39,17 @@ variable "lb_sg_id" {
   type        = string
 }
 
+variable "chart_version" {
+  description = "NGINX Gateway Fabric Helm chart version (oci://ghcr.io/nginx/charts/nginx-gateway-fabric)."
+  type        = string
+  default     = "2.2.0"
+}
+
 resource "helm_release" "nginx_fabric_gateway" {
   name             = "ngf"
   repository       = "oci://ghcr.io/nginx/charts/"
   chart            = "nginx-gateway-fabric"
+  version          = var.chart_version
   namespace        = var.namespace
   create_namespace = true
 }

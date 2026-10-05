@@ -36,10 +36,17 @@ resource "kubernetes_namespace_v1" "external_secrets" {
   }
 }
 
+variable "chart_version" {
+  description = "External Secrets Operator Helm chart version (https://charts.external-secrets.io)."
+  type        = string
+  default     = "1.2.0"
+}
+
 resource "helm_release" "external_secrets" {
   name             = "external-secrets"
   repository       = "https://charts.external-secrets.io"
   chart            = "external-secrets"
+  version          = var.chart_version
   namespace        = var.namespace
   create_namespace = true
 }
