@@ -830,15 +830,6 @@ resource "oci_core_network_security_group_security_rule" "pod_ingress_lb" {
   source_type               = "CIDR_BLOCK"
 }
 
-# Allow pods to communicate with other pods.
-resource "oci_core_network_security_group_security_rule" "pod_egress_pod" {
-  network_security_group_id = oci_core_network_security_group.k8s_worker_nsg.id
-  direction                 = "EGRESS"
-  protocol                  = "all"
-  destination               = oci_core_subnet.k8s_pod_subnet.cidr_block
-  destination_type          = "CIDR_BLOCK"
-}
-
 # Path Discovery.
 resource "oci_core_network_security_group_security_rule" "pod_egress_path_discovery" {
   network_security_group_id = oci_core_network_security_group.k8s_worker_nsg.id
@@ -919,15 +910,6 @@ resource "oci_core_network_security_group_security_rule" "pod_egress_api_control
       max = 12250
     }
   }
-}
-
-# Allow pods to communicate with other pods.
-resource "oci_core_network_security_group_security_rule" "worker_egress_pod" {
-  network_security_group_id = oci_core_network_security_group.k8s_worker_nsg.id
-  direction                 = "EGRESS"
-  protocol                  = "all"
-  destination               = oci_core_subnet.k8s_pod_subnet.cidr_block
-  destination_type          = "CIDR_BLOCK"
 }
 
 
