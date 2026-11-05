@@ -33,3 +33,9 @@ variable "approved_sender_emails" {
   type        = list(string)
   default     = []
 }
+
+variable "create_cloud_guard_policy" {
+  description = "Create the IAM policy for the Cloud Guard service. Set it to true before you apply 15-cloud-guard"
+  type        = bool
+  default     = false
+}

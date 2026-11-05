@@ -29,6 +29,12 @@ variable "public_dns_zone_records" {
   type        = list(string)
 }
 
+variable "disable_lb_security_rule_management" {
+  description = "Set the external Gateway's Load Balancer annotation security-rule-management-mode to None, so the cloud controller manager writes no security rules. Use it together with a restricted lb_ingress_source_cidrs in the network stack."
+  type        = bool
+  default     = false
+}
+
 variable "acme_registration_email" {
   description = "The email address for ACME registration"
   type        = string
@@ -56,7 +62,7 @@ resource "helm_release" "nginx_fabric_gateway" {
 
 locals {
   all_dns_zones = concat([var.external_dns_zone], var.public_dns_zone_records)
-  
+
   https_listeners = [
     for idx, zone in local.all_dns_zones : {
       name     = "https-${idx + 1}"
@@ -79,7 +85,7 @@ locals {
       }
     }
   ]
-  
+
   http_listeners = [
     for idx, zone in var.public_dns_zone_records : {
       name     = "http-${idx + 1}"
@@ -110,13 +116,16 @@ resource "kubernetes_manifest" "nginx_fabric_gateway_external" {
     spec = {
       gatewayClassName = "nginx"
       infrastructure = {
-        annotations = {
-          "external-dns.alpha.kubernetes.io/hostname"                   = "*.${var.external_dns_zone}"
-          "service.beta.kubernetes.io/oci-load-balancer-shape"          = "flexible"
-          "service.beta.kubernetes.io/oci-load-balancer-shape-flex-min" = "10"
-          "service.beta.kubernetes.io/oci-load-balancer-shape-flex-max" = "50"
-          "oci.oraclecloud.com/oci-network-security-groups"             = var.lb_sg_id
-        }
+        annotations = merge(
+          {
+            "external-dns.alpha.kubernetes.io/hostname"                   = "*.${var.external_dns_zone}"
+            "service.beta.kubernetes.io/oci-load-balancer-shape"          = "flexible"
+            "service.beta.kubernetes.io/oci-load-balancer-shape-flex-min" = "10"
+            "service.beta.kubernetes.io/oci-load-balancer-shape-flex-max" = "50"
+            "oci.oraclecloud.com/oci-network-security-groups"             = var.lb_sg_id
+          },
+          var.disable_lb_security_rule_management ? { "oci.oraclecloud.com/security-rule-management-mode" = "None" } : {},
+        )
       }
       listeners = concat(local.https_listeners, local.http_listeners)
     }

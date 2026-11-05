@@ -173,3 +173,11 @@ tasks:
       - echo "Installing metrics-server..."
       - tofu init
       - tofu apply
+
+  oci-platform:install-cloud-guard:
+    desc: "Step 15. Enable Cloud Guard in detect-only mode (requires Step 2)"
+    dir: "15-cloud-guard"
+    cmds:
+      - echo "Installing Cloud Guard..."
+      - tofu init
+      - tofu apply

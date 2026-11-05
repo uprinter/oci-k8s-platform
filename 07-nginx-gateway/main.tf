@@ -33,4 +33,6 @@ module "nginx-gateway" {
   external_dns_zone       = var.external_hosted_zone_name
   public_dns_zone_records = var.public_hosted_zone_records
   acme_registration_email = var.acme_registration_email
+
+  disable_lb_security_rule_management = var.disable_lb_security_rule_management
 }

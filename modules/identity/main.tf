@@ -12,6 +12,12 @@ variable "approved_sender_emails" {
   default = []
 }
 
+variable "create_cloud_guard_policy" {
+  description = "Create the IAM policy that the Cloud Guard service needs. Set it to true before you apply the 15-cloud-guard stack."
+  type        = bool
+  default     = false
+}
+
 variable "technical_users_domain_name" { type = string }
 variable "technical_users_domain_url" { type = string }
 
@@ -25,6 +31,40 @@ resource "oci_identity_policy" "network_path_analyzer_policy" {
     "Allow any-user to read virtual-network-family in tenancy where all { request.principal.type = 'vnpa-service' }",
     "Allow any-user to read load-balancers in tenancy where all { request.principal.type = 'vnpa-service' }",
     "Allow any-user to read network-security-group in tenancy where all { request.principal.type = 'vnpa-service' }"
+  ]
+}
+
+resource "oci_identity_policy" "cloud_guard_policy" {
+  count = var.create_cloud_guard_policy ? 1 : 0
+
+  compartment_id = var.compartment_id
+  name           = "cloud-guard-policy"
+  description    = "Policy for the Cloud Guard service"
+  statements = [
+    # The only manage grant: limited to Events rules that Cloud Guard itself
+    # creates (target.rule.type='managed'). It cannot change workloads.
+    "allow service cloudguard to manage cloudevents-rules in tenancy where target.rule.type='managed'",
+    "allow service cloudguard to read audit-events in tenancy",
+    "allow service cloudguard to read authentication-policies in tenancy",
+    "allow service cloudguard to read autonomous-database-family in tenancy",
+    "allow service cloudguard to read compartments in tenancy",
+    "allow service cloudguard to read compute-management-family in tenancy",
+    "allow service cloudguard to read database-family in tenancy",
+    "allow service cloudguard to read data-safe-family in tenancy",
+    "allow service cloudguard to read dynamic-groups in tenancy",
+    "allow service cloudguard to read groups in tenancy",
+    "allow service cloudguard to read instance-family in tenancy",
+    "allow service cloudguard to read keys in tenancy",
+    "allow service cloudguard to read load-balancers in tenancy",
+    "allow service cloudguard to read log-groups in tenancy",
+    "allow service cloudguard to read object-family in tenancy",
+    "allow service cloudguard to read policies in tenancy",
+    "allow service cloudguard to read tenancies in tenancy",
+    "allow service cloudguard to read users in tenancy",
+    "allow service cloudguard to read vaults in tenancy",
+    "allow service cloudguard to read virtual-network-family in tenancy",
+    "allow service cloudguard to read volume-family in tenancy",
+    "allow service cloudguard to use network-security-groups in tenancy"
   ]
 }
 

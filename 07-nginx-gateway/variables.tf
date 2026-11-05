@@ -38,3 +38,9 @@ variable "acme_registration_email" {
   description = "Email address used for ACME registration"
   type        = string
 }
+
+variable "disable_lb_security_rule_management" {
+  description = "Stop the cloud controller manager from writing Load Balancer security rules. Set it to true when 01-network restricts lb_ingress_source_cidrs"
+  type        = bool
+  default     = false
+}
