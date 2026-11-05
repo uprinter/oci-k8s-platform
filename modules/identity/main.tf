@@ -18,6 +18,12 @@ variable "create_cloud_guard_policy" {
   default     = false
 }
 
+variable "least_privilege_dns_and_secrets_policies" {
+  description = "Grant the ExternalDNS and ExternalSecrets users only the rights their documented operations need. The default keeps the broader rights, which also cover writing secrets back to the vault, managing keys and managing DNS zones and views."
+  type        = bool
+  default     = false
+}
+
 variable "technical_users_domain_name" { type = string }
 variable "technical_users_domain_url" { type = string }
 
@@ -131,7 +137,10 @@ resource "oci_identity_policy" "external_dns_policy" {
   compartment_id = var.compartment_id
   name           = "external-dns-policy"
   description    = "Policy for ExternalDNS"
-  statements = [
+  statements = var.least_privilege_dns_and_secrets_policies ? [
+    "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.external_dns_group.display_name}' to use dns-zones in compartment id ${var.compartment_id}",
+    "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.external_dns_group.display_name}' to manage dns-records in compartment id ${var.compartment_id}"
+    ] : [
     "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.external_dns_group.display_name}' to read dns-zones in compartment id ${var.compartment_id}",
     "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.external_dns_group.display_name}' to manage dns in compartment id ${var.compartment_id}"
   ]
@@ -187,7 +196,10 @@ resource "oci_identity_policy" "external_secrets_policy" {
   compartment_id = var.compartment_id
   name           = "external-secrets-policy"
   description    = "Policy for ExternalSecrets"
-  statements = [
+  statements = var.least_privilege_dns_and_secrets_policies ? [
+    "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.external_secrets_group.display_name}' to read vaults in compartment id ${var.compartment_id}",
+    "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.external_secrets_group.display_name}' to read secret-bundles in compartment id ${var.compartment_id}"
+    ] : [
     "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.external_secrets_group.display_name}' to use vaults in compartment id ${var.compartment_id}",
     "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.external_secrets_group.display_name}' to manage keys in compartment id ${var.compartment_id}",
     "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.external_secrets_group.display_name}' to manage secret-family in compartment id ${var.compartment_id}"

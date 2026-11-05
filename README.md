@@ -53,6 +53,38 @@ task oci-platform:install-network
 task oci-platform:install-identity
 ```
 
+#### ExternalDNS and External Secrets policies
+
+By default, Step 2 gives the two technical users these rights:
+
+- `external-dns-policy`: `read dns-zones` and `manage dns`.
+- `external-secrets-policy`: `use vaults`, `manage keys` and `manage secret-family`.
+
+These rights also let the users write secrets back to the vault, manage keys, and manage DNS zones and views.
+
+To grant only the rights that the documented operations need, set `least_privilege_dns_and_secrets_policies = true` in `02-identity/terraform.tfvars` and apply Step 2 again. The policies then contain these rights:
+
+- `external-dns-policy`: `use dns-zones` and `manage dns-records`.
+- `external-secrets-policy`: `read vaults` and `read secret-bundles`.
+
+The narrow set supports these operations:
+
+- ExternalDNS creates, updates and deletes records through `ListZones`, `GetZoneRecords` and `PatchZoneRecords`.
+- External Secrets reads named secrets through `GetSecretBundleByName` and `GetVault`. This access is read-only.
+
+The narrow set does not support these operations:
+
+- `PushSecret` or any other write of secrets back to the vault.
+- Key management (the old `manage keys` right).
+- `dataFrom.find` (looking up secrets by name or tag through `ListSecrets`).
+- Management of DNS zones, views or other DNS resource types by ExternalDNS.
+
+Set the flag to `true` only if you do not use these operations.
+
+The Oracle IAM policy reference gives these permissions: `PatchZoneRecords` needs `DNS_ZONE_UPDATE` and `DNS_RECORD_UPDATE`, which `use dns-zones` and `manage dns-records` grant. `GetSecretBundleByName` needs `SECRET_BUNDLE_READ` and `GetVault` needs `VAULT_READ`, which `read secret-bundles` and `read vaults` grant.
+
+The flag does not change the apply order. The default is `false`, so an existing deployment shows no plan change. To roll back, set the flag to `false` and apply Step 2 again.
+
 ### Step 3. Deploy OKE Cluster
 
 ```bash
