@@ -39,3 +39,9 @@ variable "create_cloud_guard_policy" {
   type        = bool
   default     = false
 }
+
+variable "least_privilege_dns_and_secrets_policies" {
+  description = "Grant the ExternalDNS and ExternalSecrets users only the rights their documented operations need. The default keeps the broader rights, which also cover writing secrets back to the vault, managing keys and managing DNS zones and views."
+  type        = bool
+  default     = false
+}

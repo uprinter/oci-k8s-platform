@@ -24,6 +24,8 @@ module "identity" {
   technical_users_domain_name = var.technical_users_domain_name
   approved_sender_emails      = var.approved_sender_emails
   create_cloud_guard_policy   = var.create_cloud_guard_policy
+
+  least_privilege_dns_and_secrets_policies = var.least_privilege_dns_and_secrets_policies
 }
 
 output "technical_users_domain_url" {
