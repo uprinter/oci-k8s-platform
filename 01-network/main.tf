@@ -15,9 +15,10 @@ provider "oci" {
 }
 
 module "network" {
-  source               = "../modules/network"
-  compartment_id       = var.root_compartment_id
-  dns_listener_address = var.dns_listener_address
+  source                  = "../modules/network"
+  compartment_id          = var.root_compartment_id
+  dns_listener_address    = var.dns_listener_address
+  lb_ingress_source_cidrs = var.lb_ingress_source_cidrs
 }
 
 output "vcn_id" {

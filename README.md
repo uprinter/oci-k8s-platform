@@ -14,6 +14,7 @@ Default setup manages the following components:
 - [**cert-manager**](http://cert-manager.io/) for automated TLS certificate management
 - [**F5 NGINX Gateway Fabric**](https://docs.nginx.com/nginx-gateway-fabric) as a Kubernetes Gateway API implementation
 - [**ExternalDNS**](https://github.com/kubernetes-sigs/external-dns) for automatic DNS record management for Kubernetes services
+- [**Cloud Guard**](https://docs.oracle.com/iaas/cloud-guard/using/part-start.htm) in detect-only mode with email notifications
 - [**Cloudflare Origin CA issuer**](https://github.com/cloudflare/origin-ca-issuer) (optional) for issuing origin certificates to hosts served behind Cloudflare's proxy
 
 ## ⚠️ This repository is PUBLIC
@@ -182,7 +183,7 @@ Before applying it:
 - Create `12-origin-ca-issuer/terraform.tfvars` (gitignored) and set the required variables — notably the name of the OCI Vault secret holding the scoped Origin CA token, the origin certificate's Secret name (must match the name the gateway listener expects, `replace(host, ".", "-") + "-cert"`), and its SANs. None of these have defaults, by design (see the public-repo rule above).
 - The origin certificate is intentionally named identically to its target Secret and carries no owner reference, so cert-manager's Gateway shim detects it and does not issue a competing certificate for the same listener.
 
-> The shared Load Balancer NSG (`modules/network`) intentionally keeps its world-open `:443` ingress rule — a Cloudflare-only firewall lockdown was considered and deliberately not adopted, to keep the LB flexible for non-Cloudflare-fronted traffic. The origin is reachable directly, not only through Cloudflare's proxy; that tradeoff is a conscious choice, not an oversight.
+> By default, the shared Load Balancer accepts TCP 443 from all sources, so the origin is also reachable directly and not only through Cloudflare's proxy. To accept traffic only from Cloudflare, see [Restrict the Load Balancer to Cloudflare (optional)](#restrict-the-load-balancer-to-cloudflare-optional).
 
 #### Step 6.8. Deploy OCI Block Volume StorageClass
 
@@ -213,3 +214,69 @@ Notes:
 - The chart's default `--kubelet-preferred-address-types` already prefers `InternalIP`, which is what OKE nodes publish, so no override is needed.
 - The container has a memory limit but deliberately no CPU limit — CPU throttling stalls the scrape loop and leaves gaps in the reported metrics.
 - Metrics are in-memory and short-lived; this provides live utilization only, not historical trend data. A restart resets it, and it is not a substitute for Prometheus.
+
+### Step 7. Enable Cloud Guard (detect-only)
+
+Cloud Guard needs the `cloud-guard-policy` from Step 2. Step 2 does not create this policy by default. This step does not need the VPN or kubeconfig.
+
+1. Set `create_cloud_guard_policy = true` in `02-identity/terraform.tfvars` and apply Step 2 again (`task oci-platform:install-identity`). Do this before you apply `15-cloud-guard`.
+2. Create `15-cloud-guard/backend.tf` (gitignored).
+3. Create `15-cloud-guard/terraform.tfvars` (gitignored) and set these variables:
+   - `root_compartment_id`: the tenancy OCID.
+   - `region` and `reporting_region`: set both to the same region.
+   - `notification_email`: the address that receives the alerts. This variable is sensitive and has no default. Do not put the address in a tracked file.
+   - `min_risk_levels` (optional): the default is `["CRITICAL", "HIGH"]`. An empty list sends every problem.
+4. Run the task:
+
+   ```bash
+   task oci-platform:install-cloud-guard
+   ```
+
+5. Open the email from OCI Notifications and click the confirmation link. Until you confirm, the subscription stays pending and no alert is sent.
+
+What this step creates:
+
+- The Cloud Guard configuration, with status `ENABLED`.
+- A target on the root compartment with the Oracle-managed Configuration, Activity and Threat detector recipes.
+- A clone of the Oracle responder recipe. All rules are disabled except `EVENT`, so Cloud Guard reports problems and changes no resource.
+- A Notifications topic with one email subscription, and an Events rule that sends detected problems to the topic.
+
+> **Rollback:** `tofu destroy` does not disable Cloud Guard, because the provider's delete for the configuration resource makes no API call. Cloud Guard stays `ENABLED`. To disable it, set `status = "DISABLED"` in `modules/cloud-guard/main.tf` and apply the stack.
+
+## Restrict the Load Balancer to Cloudflare (optional)
+
+By default, the shared Load Balancer accepts TCP 443 from all sources. If all your public hostnames are proxied through Cloudflare, you can accept traffic only from Cloudflare's IPv4 ranges. Two settings do this, and you must set both:
+
+- `lb_ingress_source_cidrs` in `01-network/terraform.tfvars`: the CIDRs that can reach the Load Balancer on TCP 443. When the list does not contain `0.0.0.0/0`, `modules/network` also adopts the VCN default security list and keeps only the rules from the Load Balancer subnet to the worker node ports. This removes all other rules from that list, including the world-open rules that the cloud controller manager wrote.
+- `disable_lb_security_rule_management = true` in `07-nginx-gateway/terraform.tfvars`: the external Gateway gets the annotation `oci.oraclecloud.com/security-rule-management-mode: "None"`, so the cloud controller manager does not write security rules for the Load Balancer.
+
+Example for `01-network/terraform.tfvars`, with the IPv4 ranges that Cloudflare published at the time of writing:
+
+```hcl
+lb_ingress_source_cidrs = [
+  "173.245.48.0/20",
+  "103.21.244.0/22",
+  "103.22.200.0/22",
+  "103.31.4.0/22",
+  "141.101.64.0/18",
+  "108.162.192.0/18",
+  "190.93.240.0/20",
+  "188.114.96.0/20",
+  "197.234.240.0/22",
+  "198.41.128.0/17",
+  "162.158.0.0/15",
+  "104.16.0.0/13",
+  "104.24.0.0/14",
+  "172.64.0.0/13",
+  "131.0.72.0/22",
+]
+```
+
+Procedure:
+
+1. Get the current list from `https://api.cloudflare.com/client/v4/ips` (field `result.ipv4_cidrs`) and compare it with your list.
+2. Apply `07-nginx-gateway` first (`task oci-platform:install-nginx-gateway`). If you apply `01-network` first, the cloud controller manager can write a world-open rule again before the annotation is live.
+3. Apply `01-network` (`task oci-platform:install-network`).
+4. When Cloudflare publishes new ranges, update the list and apply `01-network` again. Traffic from a range that is not in the list cannot reach the Load Balancer.
+
+> A hostname that is not proxied through Cloudflare cannot reach the Load Balancer after this change. To go back, remove both settings, apply `01-network`, and then apply `07-nginx-gateway`.
