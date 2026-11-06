@@ -1,3 +1,9 @@
+variable "pod_security_labels" {
+  description = "Pod Security Admission labels for the namespace, for example pod-security.kubernetes.io/enforce = \"baseline\". Empty map sets no labels."
+  type        = map(string)
+  default     = {}
+}
+
 variable "compartment_id" { type = string }
 
 variable "namespace" {
@@ -32,7 +38,8 @@ variable "oke_external_secrets_vault_ocid" {
 
 resource "kubernetes_namespace_v1" "external_secrets" {
   metadata {
-    name = var.namespace
+    name   = var.namespace
+    labels = var.pod_security_labels
   }
 }
 

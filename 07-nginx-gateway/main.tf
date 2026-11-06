@@ -35,4 +35,5 @@ module "nginx-gateway" {
   acme_registration_email = var.acme_registration_email
 
   disable_lb_security_rule_management = var.disable_lb_security_rule_management
+  pod_security_labels                 = var.pod_security_labels
 }

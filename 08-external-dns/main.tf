@@ -25,10 +25,11 @@ provider "kubernetes" {
 }
 
 module "external-dns" {
-  source          = "../modules/external-dns"
-  region          = var.region
-  tenancy_ocid    = var.root_compartment_id
-  user_ocid       = var.external_dns_user_ocid
-  private_key_pem = var.oci_api_private_key
-  fingerprint     = var.oci_api_private_key_fingerprint
+  source              = "../modules/external-dns"
+  region              = var.region
+  tenancy_ocid        = var.root_compartment_id
+  user_ocid           = var.external_dns_user_ocid
+  private_key_pem     = var.oci_api_private_key
+  fingerprint         = var.oci_api_private_key_fingerprint
+  pod_security_labels = var.pod_security_labels
 }

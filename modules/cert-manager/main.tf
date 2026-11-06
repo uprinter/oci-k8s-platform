@@ -1,6 +1,13 @@
+variable "pod_security_labels" {
+  description = "Pod Security Admission labels for the namespace, for example pod-security.kubernetes.io/enforce = \"baseline\". Empty map sets no labels."
+  type        = map(string)
+  default     = {}
+}
+
 resource "kubernetes_namespace" "cert_manager" {
   metadata {
-    name = "cert-manager"
+    name   = "cert-manager"
+    labels = var.pod_security_labels
   }
 }
 
