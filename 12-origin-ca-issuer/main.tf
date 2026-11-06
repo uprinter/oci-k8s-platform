@@ -36,4 +36,5 @@ module "origin-ca-issuer" {
   certificate_namespace   = var.nginx_gateway_namespace
   certificate_name        = var.origin_certificate_secret_name
   certificate_dns_names   = var.origin_certificate_dns_names
+  pod_security_labels     = var.pod_security_labels
 }

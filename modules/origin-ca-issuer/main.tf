@@ -1,3 +1,9 @@
+variable "pod_security_labels" {
+  description = "Pod Security Admission labels for the namespace, for example pod-security.kubernetes.io/enforce = \"baseline\". Empty map sets no labels."
+  type        = map(string)
+  default     = {}
+}
+
 variable "namespace" {
   description = "Namespace where the origin-ca-issuer controller runs. Also the clusterResourceNamespace where ClusterOriginIssuer token secrets are resolved."
   type        = string
@@ -87,7 +93,8 @@ variable "certificate_renew_before" {
 
 resource "kubernetes_namespace_v1" "origin_ca_issuer" {
   metadata {
-    name = var.namespace
+    name   = var.namespace
+    labels = var.pod_security_labels
   }
 }
 

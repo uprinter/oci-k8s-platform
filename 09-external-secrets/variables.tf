@@ -33,3 +33,9 @@ variable "user_ocid" {
   type = string
   description = "OCID of the user that will be used to deploy resources"
 }
+
+variable "pod_security_labels" {
+  description = "Pod Security Admission labels for the namespace. Empty map sets no labels."
+  type        = map(string)
+  default     = {}
+}

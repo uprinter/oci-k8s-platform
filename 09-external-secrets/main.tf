@@ -33,4 +33,5 @@ module "external-secrets" {
   private_key_pem                 = var.oci_api_private_key
   fingerprint                     = var.oci_api_private_key_fingerprint
   oke_external_secrets_vault_ocid = var.oke_external_secrets_vault_ocid
+  pod_security_labels             = var.pod_security_labels
 }

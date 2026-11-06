@@ -1,3 +1,9 @@
+variable "pod_security_labels" {
+  description = "Pod Security Admission labels for the namespace, for example pod-security.kubernetes.io/enforce = \"baseline\". Empty map sets no labels."
+  type        = map(string)
+  default     = {}
+}
+
 variable "namespace" {
   description = "The namespace where resources will be created"
   type        = string
@@ -58,6 +64,22 @@ resource "helm_release" "nginx_fabric_gateway" {
   version          = var.chart_version
   namespace        = var.namespace
   create_namespace = true
+}
+
+# Helm creates the namespace, so Terraform patches the labels onto it instead of owning it.
+resource "kubernetes_labels" "pod_security" {
+  count = length(var.pod_security_labels) > 0 ? 1 : 0
+
+  api_version = "v1"
+  kind        = "Namespace"
+
+  metadata {
+    name = var.namespace
+  }
+
+  labels = var.pod_security_labels
+
+  depends_on = [helm_release.nginx_fabric_gateway]
 }
 
 locals {

@@ -29,3 +29,9 @@ variable "origin_certificate_dns_names" {
   description = "SANs for the Origin CA certificate (apex + wildcard is the usual choice, so one cert covers the apex and any subdomain). Set via terraform.tfvars (gitignored) — this repo is public, so no domain name is committed as a default."
   type        = list(string)
 }
+
+variable "pod_security_labels" {
+  description = "Pod Security Admission labels for the namespace. Empty map sets no labels."
+  type        = map(string)
+  default     = {}
+}

@@ -247,6 +247,27 @@ Notes:
 - The container has a memory limit but deliberately no CPU limit — CPU throttling stalls the scrape loop and leaves gaps in the reported metrics.
 - Metrics are in-memory and short-lived; this provides live utilization only, not historical trend data. A restart resets it, and it is not a substitute for Prometheus.
 
+### Pod Security Admission labels (optional)
+
+Stacks `06-cert-manager`, `07-nginx-gateway`, `08-external-dns`, `09-external-secrets` and `12-origin-ca-issuer` accept the variable `pod_security_labels` (map of strings, default `{}`). With the default, no label is set and a plan shows no change.
+
+To enforce a Pod Security Standard on a namespace, set the labels in the tfvars of the stack, for example:
+
+```hcl
+pod_security_labels = {
+  "pod-security.kubernetes.io/enforce" = "baseline"
+  "pod-security.kubernetes.io/warn"    = "restricted"
+  "pod-security.kubernetes.io/audit"   = "restricted"
+}
+```
+
+Notes:
+
+- Four stacks put the labels in the namespace resource, so the change is an in-place update. `07-nginx-gateway` uses a `kubernetes_labels` resource because Helm creates its namespace; Terraform patches the labels and does not own the namespace.
+- A label change does not restart or evict running pods. The `enforce` level applies only when a pod is created.
+- Before you set `enforce`, check that every pod template in the namespace passes the level. Build a Pod from each workload template and run `kubectl create --dry-run=server -f -` in a namespace that has the label. A label dry-run (`kubectl label --dry-run=server`) only warns about existing pods and does not show pods that CI or a controller creates later.
+- To roll back, set the variable to `{}` and apply the stack.
+
 ### Step 7. Enable Cloud Guard (detect-only)
 
 Cloud Guard needs the `cloud-guard-policy` from Step 2. Step 2 does not create this policy by default. This step does not need the VPN or kubeconfig.

@@ -1,3 +1,9 @@
+variable "pod_security_labels" {
+  description = "Pod Security Admission labels for the namespace, for example pod-security.kubernetes.io/enforce = \"baseline\". Empty map sets no labels."
+  type        = map(string)
+  default     = {}
+}
+
 variable "namespace" {
   description = "The namespace where external-dns will be installed"
   type        = string
@@ -45,7 +51,8 @@ locals {
 
 resource "kubernetes_namespace" "external_dns" {
   metadata {
-    name = var.namespace
+    name   = var.namespace
+    labels = var.pod_security_labels
   }
 }
 
