@@ -54,7 +54,7 @@ task oci-platform:generate-user-keys
 task oci-platform:install-identity
 ```
 
-`generate-user-keys` creates one API key pair for the `external-dns` user and one for the `external-secrets` user in `.keys/next/<user>/`. It does not overwrite a key that exists.
+`generate-user-keys` creates one API key pair for the `external-dns` user and one for the `external-secrets` user in `.keys/next/<user>/`. It creates only the pairs that are missing. It never overwrites a private key that exists.
 
 #### Upgrade from the shared API key
 
@@ -74,7 +74,13 @@ Earlier versions gave the two users one shared API key from `.keys/oci/`. If you
    ```
 
 3. Run `task oci-platform:install-external-dns` and `task oci-platform:install-external-secrets`.
-4. Restart the ExternalDNS deployment. ExternalDNS reads its configuration only when it starts.
+4. Restart ExternalDNS. ExternalDNS reads its configuration only when it starts. Replace `<namespace>` with the ExternalDNS namespace (the default is `external-dns`):
+
+   ```bash
+   kubectl -n <namespace> rollout restart deployment/external-dns
+   kubectl -n <namespace> rollout status deployment/external-dns
+   ```
+
 5. Make sure that all ExternalSecrets are `Ready` and that the ExternalDNS log shows no authentication error.
 6. Run `task oci-platform:install-identity`. The plan must show only the deletion of the two `external_dns_api_key` and `external_secrets_api_key` resources.
 

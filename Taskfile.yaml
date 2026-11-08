@@ -7,21 +7,32 @@ tasks:
       - oci session authenticate
 
   oci-platform:generate-user-keys:
-    desc: "Step 0. Generate one API key pair for each of ExternalDNS and ExternalSecrets in .keys/next (never overwrites)"
+    desc: "Step 0. Generate the missing API key pairs of ExternalDNS and ExternalSecrets in .keys/next (never overwrites a private key)"
     cmds:
       - |
+        set -euo pipefail
         for u in external-dns external-secrets; do
           d=.keys/next/$u
+          mkdir -p "$d" && chmod 700 "$d"
           if [ -e "$d/private.pem" ]; then
-            echo "$d/private.pem exists: not overwriting it." >&2
+            echo "$d/private.pem exists: keeping it."
+          else
+            openssl genrsa -out "$d/private.pem" 2048 2>/dev/null
+            echo "$d/private.pem created."
+          fi
+          chmod 600 "$d/private.pem"
+          if ! openssl rsa -check -noout -in "$d/private.pem" >/dev/null 2>&1; then
+            echo "$d/private.pem is not a valid RSA private key: fix or remove it by hand." >&2
             exit 1
           fi
-          mkdir -p "$d" && chmod 700 "$d"
-          openssl genrsa -out "$d/private.pem" 2048 2>/dev/null
-          chmod 600 "$d/private.pem"
-          openssl rsa -pubout -in "$d/private.pem" -out "$d/public.pem" 2>/dev/null
-          openssl rsa -pubout -outform DER -in "$d/private.pem" 2>/dev/null | openssl md5 -c | sed 's/^.*= //' | tr -d '\n' > "$d/fingerprint.txt"
-          echo "Keys generated in $d (fingerprint $(cat "$d/fingerprint.txt"))"
+          # public.pem and fingerprint.txt are derived from private.pem, so they are recreated when missing.
+          if [ ! -s "$d/public.pem" ]; then
+            openssl rsa -pubout -in "$d/private.pem" -out "$d/public.pem" 2>/dev/null
+          fi
+          if [ ! -s "$d/fingerprint.txt" ]; then
+            openssl rsa -pubout -outform DER -in "$d/private.pem" 2>/dev/null | openssl md5 -c | sed 's/^.*= //' | tr -d '\n' > "$d/fingerprint.txt"
+          fi
+          echo "$d: fingerprint $(cat "$d/fingerprint.txt")"
         done
 
   oci-platform:generate-ci-keys:

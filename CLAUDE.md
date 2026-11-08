@@ -66,7 +66,7 @@ There are no tests, linters, or build steps — this is pure IaC.
 
 Each user has its own key pair in `.keys/next/<user>/` (`private.pem`, `public.pem`, `fingerprint.txt`). Steps 2 and 5 are code changes. To rotate a key:
 
-1. Generate the new pair in a new folder, for example `.keys/rot-<date>/<user>/`. `generate-user-keys` refuses to overwrite `.keys/next`.
+1. Generate the new pair in a new folder, for example `.keys/rot-<date>/<user>/`. `generate-user-keys` never overwrites a private key in `.keys/next`.
 2. Add a second `oci_identity_domains_api_key` resource and variable for the user, and pass the new public key in `install-identity`. A user may hold up to 3 keys, so keep the old key until step 5.
 3. Apply `02-identity`, then apply `08-external-dns` and `09-external-secrets` with the new private key and fingerprint. Restart external-dns, because it reads its config only at start.
 4. Check that the Secrets hold the new fingerprint, that all ExternalSecrets are Ready and that external-dns logs no auth error.
