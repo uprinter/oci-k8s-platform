@@ -15,15 +15,16 @@ provider "oci" {
 }
 
 module "identity" {
-  source                      = "../modules/identity"
-  compartment_id              = var.root_compartment_id
-  region                      = var.region
-  oci_api_public_key          = var.oci_api_public_key
-  ci_terraform_public_key     = var.ci_terraform_public_key
-  technical_users_domain_url  = var.technical_users_domain_url
-  technical_users_domain_name = var.technical_users_domain_name
-  approved_sender_emails      = var.approved_sender_emails
-  create_cloud_guard_policy   = var.create_cloud_guard_policy
+  source                           = "../modules/identity"
+  compartment_id                   = var.root_compartment_id
+  region                           = var.region
+  external_dns_next_public_key     = var.external_dns_next_public_key
+  external_secrets_next_public_key = var.external_secrets_next_public_key
+  ci_terraform_public_key          = var.ci_terraform_public_key
+  technical_users_domain_url       = var.technical_users_domain_url
+  technical_users_domain_name      = var.technical_users_domain_name
+  approved_sender_emails           = var.approved_sender_emails
+  create_cloud_guard_policy        = var.create_cloud_guard_policy
 
   least_privilege_dns_and_secrets_policies = var.least_privilege_dns_and_secrets_policies
 }
@@ -56,4 +57,14 @@ output "ci_terraform_user_ocid" {
 output "ci_terraform_api_key_fingerprint" {
   value       = module.identity.ci_terraform_api_key_fingerprint
   description = "Fingerprint of the CI technical user's API key"
+}
+
+output "external_dns_next_api_key_fingerprint" {
+  value       = module.identity.external_dns_next_api_key_fingerprint
+  description = "Fingerprint of the external-dns user API key (null when none)"
+}
+
+output "external_secrets_next_api_key_fingerprint" {
+  value       = module.identity.external_secrets_next_api_key_fingerprint
+  description = "Fingerprint of the external-secrets user API key (null when none)"
 }

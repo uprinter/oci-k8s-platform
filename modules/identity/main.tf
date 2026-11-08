@@ -1,6 +1,16 @@
 variable "compartment_id" { type = string }
 variable "region" { type = string }
-variable "oci_api_public_key" { type = string }
+variable "external_dns_next_public_key" {
+  description = "PEM public key for the API key of the external-dns user. Null creates no key."
+  type        = string
+  default     = null
+}
+
+variable "external_secrets_next_public_key" {
+  description = "PEM public key for the API key of the external-secrets user. Null creates no key."
+  type        = string
+  default     = null
+}
 
 variable "ci_terraform_public_key" {
   description = "PEM-formatted RSA public key registered as the CI technical user's API key. The matching private key is generated out-of-band and never enters state."
@@ -91,9 +101,11 @@ output "technical_users_domain_name" {
   value = oci_identity_domain.technical_users_domain.display_name
 }
 
-resource "oci_identity_domains_api_key" "external_dns_api_key" {
+resource "oci_identity_domains_api_key" "external_dns_api_key_next" {
+  count = var.external_dns_next_public_key == null ? 0 : 1
+
   idcs_endpoint = var.technical_users_domain_url
-  key           = var.oci_api_public_key
+  key           = var.external_dns_next_public_key
   schemas       = ["urn:ietf:params:scim:schemas:oracle:idcs:apikey"]
 
   user {
@@ -150,9 +162,11 @@ output "external_dns_user_ocid" {
   value = oci_identity_domains_user.external_dns_user.ocid
 }
 
-resource "oci_identity_domains_api_key" "external_secrets_api_key" {
+resource "oci_identity_domains_api_key" "external_secrets_api_key_next" {
+  count = var.external_secrets_next_public_key == null ? 0 : 1
+
   idcs_endpoint = var.technical_users_domain_url
-  key           = var.oci_api_public_key
+  key           = var.external_secrets_next_public_key
   schemas       = ["urn:ietf:params:scim:schemas:oracle:idcs:apikey"]
 
   user {
@@ -328,4 +342,12 @@ output "ci_terraform_user_ocid" {
 
 output "ci_terraform_api_key_fingerprint" {
   value = oci_identity_domains_api_key.ci_terraform_api_key.fingerprint
+}
+
+output "external_dns_next_api_key_fingerprint" {
+  value = one(oci_identity_domains_api_key.external_dns_api_key_next[*].fingerprint)
+}
+
+output "external_secrets_next_api_key_fingerprint" {
+  value = one(oci_identity_domains_api_key.external_secrets_api_key_next[*].fingerprint)
 }

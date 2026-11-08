@@ -6,16 +6,23 @@ tasks:
     cmds:
       - oci session authenticate
 
-  oci-platform:generate-oci-keys:
-    desc: "Step 0. Generate the shared OCI API key pair for ExternalDNS and ExternalSecrets"
+  oci-platform:generate-user-keys:
+    desc: "Step 0. Generate one API key pair for each of ExternalDNS and ExternalSecrets in .keys/next (never overwrites)"
     cmds:
-      - echo "Generating shared OCI API key pair for ExternalDNS and ExternalSecrets"
-      - rm -rf ./.keys/oci
-      - mkdir -p ./.keys/oci
-      - openssl genrsa -out .keys/oci/oci_api_key.pem 2048
-      - openssl rsa -pubout -in .keys/oci/oci_api_key.pem -out .keys/oci/oci_api_key_public.pem
-      - openssl rsa -pubout -outform DER -in .keys/oci/oci_api_key.pem | openssl md5 -c | sed 's/^.*= //' > .keys/oci/fingerprint.txt
-      - echo "Keys generated in .keys/oci/ directory"
+      - |
+        for u in external-dns external-secrets; do
+          d=.keys/next/$u
+          if [ -e "$d/private.pem" ]; then
+            echo "$d/private.pem exists: not overwriting it." >&2
+            exit 1
+          fi
+          mkdir -p "$d" && chmod 700 "$d"
+          openssl genrsa -out "$d/private.pem" 2048 2>/dev/null
+          chmod 600 "$d/private.pem"
+          openssl rsa -pubout -in "$d/private.pem" -out "$d/public.pem" 2>/dev/null
+          openssl rsa -pubout -outform DER -in "$d/private.pem" 2>/dev/null | openssl md5 -c | sed 's/^.*= //' | tr -d '\n' > "$d/fingerprint.txt"
+          echo "Keys generated in $d (fingerprint $(cat "$d/fingerprint.txt"))"
+        done
 
   oci-platform:generate-ci-keys:
     desc: "Step 0. Generate key pair for the ci-terraform technical user"
@@ -50,11 +57,18 @@ tasks:
     cmds:
       - echo "Installing identity layer..."
       - |
-        PUBLIC_KEY=$(cat ../.keys/oci/oci_api_key_public.pem)
         CI_PUBLIC_KEY=$(cat ../.keys/ci/ci-terraform_public.pem)
+        # The API keys of the two technical users come from ../.keys/next/<user>/public.pem.
+        for u in external-dns external-secrets; do
+          if [ ! -f ../.keys/next/$u/public.pem ]; then
+            echo "Missing ../.keys/next/$u/public.pem: the user would lose its API key." >&2
+            exit 1
+          fi
+        done
+        export TF_VAR_external_dns_next_public_key="$(cat ../.keys/next/external-dns/public.pem)"
+        export TF_VAR_external_secrets_next_public_key="$(cat ../.keys/next/external-secrets/public.pem)"
         tofu init
         tofu apply \
-          -var="oci_api_public_key=$PUBLIC_KEY" \
           -var="ci_terraform_public_key=$CI_PUBLIC_KEY"
 
   oci-platform:install-oke:
@@ -106,8 +120,14 @@ tasks:
     cmds:
       - echo "Installing ExternalDNS..."
       - |
-        PRIVATE_KEY=$(cat ../.keys/oci/oci_api_key.pem)
-        FINGERPRINT=$(cat ../.keys/oci/fingerprint.txt)
+        # Use the key in ../.keys/next/external-dns.
+        if [ -f ../.keys/next/external-dns/private.pem ]; then
+          PRIVATE_KEY=$(cat ../.keys/next/external-dns/private.pem)
+          FINGERPRINT=$(cat ../.keys/next/external-dns/fingerprint.txt)
+        else
+          echo "Missing ../.keys/next/external-dns/private.pem: run task oci-platform:generate-user-keys first." >&2
+          exit 1
+        fi
         tofu init
         tofu apply \
           -var="oci_api_private_key=$PRIVATE_KEY" \
@@ -119,8 +139,14 @@ tasks:
     cmds:
       - echo "Installing ExternalSecrets..."
       - |
-        PRIVATE_KEY=$(cat ../.keys/oci/oci_api_key.pem)
-        FINGERPRINT=$(cat ../.keys/oci/fingerprint.txt)
+        # Use the key in ../.keys/next/external-secrets.
+        if [ -f ../.keys/next/external-secrets/private.pem ]; then
+          PRIVATE_KEY=$(cat ../.keys/next/external-secrets/private.pem)
+          FINGERPRINT=$(cat ../.keys/next/external-secrets/fingerprint.txt)
+        else
+          echo "Missing ../.keys/next/external-secrets/private.pem: run task oci-platform:generate-user-keys first." >&2
+          exit 1
+        fi
         tofu init
         tofu apply -exclude="module.external-secrets.kubernetes_manifest.oci_secret_store" \
           -var="oci_api_private_key=$PRIVATE_KEY" \

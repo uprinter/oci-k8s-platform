@@ -31,17 +31,17 @@ All operations are driven through `Taskfile.yaml` using [Task](https://taskfile.
 ```bash
 task --list                                       # all tasks
 task oci:login                                    # OCI session auth (run first)
-task oci-platform:generate-oci-keys               # creates .keys/oci/* (consumed by 02 & 08 & 09)
+task oci-platform:generate-user-keys              # creates .keys/next/<user>/* (consumed by 02 & 08 & 09)
 task oci-platform:generate-ci-keys                # creates .keys/ci/* (consumed by 02-identity)
 task oci-platform:generate-ssh-keys               # creates .keys/ssh/* (consumed by 03-oke)
 task oci-platform:install-network                 # Step 1
-task oci-platform:install-identity                # Step 2 (injects shared OCI + CI public keys)
+task oci-platform:install-identity                # Step 2 (injects the two user public keys + the CI public key)
 task oci-platform:install-oke                     # Step 3 (injects SSH public key)
 task oci-platform:install-dns                     # Step 4
 task oci-platform:install-vpn                     # Step 5 (optional — see README for manual path)
 task oci-platform:install-cert-manager            # Step 6.1 — requires VPN + kubeconfig
 task oci-platform:install-nginx-gateway           # Step 6.2
-task oci-platform:install-external-dns            # Step 6.3 (injects shared OCI private key + fingerprint)
+task oci-platform:install-external-dns            # Step 6.3 (injects the external-dns private key + fingerprint)
 task oci-platform:install-external-secrets        # Step 6.4 (two-phase apply — see below)
 task oci-platform:install-gitlab-agent            # Step 6.5
 task oci-platform:install-filesystem-storage-class # Step 6.6
@@ -62,6 +62,18 @@ tofu destroy ...                                  # use the matching task var-in
 
 There are no tests, linters, or build steps — this is pure IaC.
 
+## API key rotation (external-dns, external-secrets)
+
+Each user has its own key pair in `.keys/next/<user>/` (`private.pem`, `public.pem`, `fingerprint.txt`). Steps 2 and 5 are code changes. To rotate a key:
+
+1. Generate the new pair in a new folder, for example `.keys/rot-<date>/<user>/`. `generate-user-keys` refuses to overwrite `.keys/next`.
+2. Add a second `oci_identity_domains_api_key` resource and variable for the user, and pass the new public key in `install-identity`. A user may hold up to 3 keys, so keep the old key until step 5.
+3. Apply `02-identity`, then apply `08-external-dns` and `09-external-secrets` with the new private key and fingerprint. Restart external-dns, because it reads its config only at start.
+4. Check that the Secrets hold the new fingerprint, that all ExternalSecrets are Ready and that external-dns logs no auth error.
+5. Remove the old key resource and variable, move the new pair to `.keys/next/<user>/`, and apply `02-identity`. A deleted key cannot be restored; the fallback is a new key pair.
+
+Never print a private key in a terminal, a log or a review. Plan files of stacks 08 and 09 contain the private key; delete them after use.
+
 ## Architecture
 
 **Two-layer pattern.** Each numbered top-level directory (`NN-name/`) is a thin **stack** (root module): provider config, a single `module` call into `modules/<name>/`, plus `variables.tf` / `terraform.tfvars` / `backend.tf` / `main.tf`. The reusable logic lives in `modules/<name>/main.tf`. To change behavior, edit the module; to change wiring between stacks, edit the stack.
@@ -70,7 +82,7 @@ There are no tests, linters, or build steps — this is pure IaC.
 
 **Dependency order (do not reorder):**
 1. `01-network` — VCN, subnets (worker, api, lb, pod, vpn, fss_mount_target), NSGs, gateways
-2. `02-identity` — compartments, dynamic groups, IAM policies, including the `external-dns` and `external-secrets` technical users that share the public key from `.keys/oci/` and the `ci-terraform` technical user that consumes the one from `.keys/ci/`, and, only when `create_cloud_guard_policy = true` (default `false`), the `cloud-guard-policy` for the Cloud Guard service. `least_privilege_dns_and_secrets_policies` (default `false`) selects the statements of `external-dns-policy` and `external-secrets-policy`; see "ExternalDNS and External Secrets policies" below
+2. `02-identity` — compartments, dynamic groups, IAM policies, including the `external-dns` and `external-secrets` technical users that each use their own public key from `.keys/next/<user>/` and the `ci-terraform` technical user that consumes the one from `.keys/ci/`, and, only when `create_cloud_guard_policy = true` (default `false`), the `cloud-guard-policy` for the Cloud Guard service. `least_privilege_dns_and_secrets_policies` (default `false`) selects the statements of `external-dns-policy` and `external-secrets-policy`; see "ExternalDNS and External Secrets policies" below
 3. `03-oke` — OKE cluster + node pool + KMS vault for external-secrets; outputs `oke_external_secrets_vault_ocid`
 4. `04-dns` — OCI DNS zones
 5. `05-vpn` — OpenVPN instance (optional automated path; the manual marketplace path in README is the default)
@@ -79,7 +91,7 @@ There are no tests, linters, or build steps — this is pure IaC.
 
 **Secret handling.** `.gitignore` excludes `*.tfvars`, `backend.tf`, `.keys/`, and `*.tfstate*`. That means:
 - `terraform.tfvars` and `backend.tf` in each stack are local-only and contain real OCIDs / GitLab tokens / etc. Never commit them. `backend.tf.template` shows the supported backend shapes.
-- The shared OCI API key (used by both the `external-dns` and `external-secrets` technical users), the CI API key, and the SSH keys live in `.keys/oci/`, `.keys/ci/`, and `.keys/ssh/` and are injected at apply time via `-var=` from the Taskfile — never baked into tfvars.
+- The API keys of the `external-dns` and `external-secrets` technical users (one pair each), the CI API key, and the SSH keys live in `.keys/next/<user>/`, `.keys/ci/`, and `.keys/ssh/` and are injected at apply time via `-var=` from the Taskfile — never baked into tfvars.
 - When adding a new stack, also create its own `backend.tf` (gitignored) and `terraform.tfvars` (gitignored).
 
 **DNS zone scope and public record ownership (`04`, `07`, `08`).** `modules/dns` creates both the internal and the external zone with `scope = "PRIVATE"`; only names listed in `public_dns_zones` get a `GLOBAL` zone. A deployment that leaves `public_zone_names = []` therefore has no public OCI zone at all, and both wildcard zones resolve only inside the VCN. The external zone is "external" because its Gateway sits behind the public Load Balancer, not because its names resolve on the internet. With no OCI zone for a public name, external-dns cannot create its record here at all — so a public name reaching this platform is never served by a record this repo owns. Each public record is instead owned by the edge/CDN provider fronting it and lives in that provider's own IaC repo — look there, not here, when a public name resolves to an unexpected address.
