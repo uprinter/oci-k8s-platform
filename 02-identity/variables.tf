@@ -8,11 +8,6 @@ variable "region" {
   type        = string
 }
 
-variable "oci_api_public_key" {
-  description = "Public key for OCI API"
-  type        = string
-}
-
 variable "ci_terraform_public_key" {
   description = "PEM public key registered as the CI technical user's API key"
   type        = string
@@ -44,4 +39,16 @@ variable "least_privilege_dns_and_secrets_policies" {
   description = "Grant the ExternalDNS and ExternalSecrets users only the rights their documented operations need. The default keeps the broader rights, which also cover writing secrets back to the vault, managing keys and managing DNS zones and views."
   type        = bool
   default     = false
+}
+
+variable "external_dns_next_public_key" {
+  description = "PEM public key for the API key of the external-dns user. Null creates no key."
+  type        = string
+  default     = null
+}
+
+variable "external_secrets_next_public_key" {
+  description = "PEM public key for the API key of the external-secrets user. Null creates no key."
+  type        = string
+  default     = null
 }

@@ -50,8 +50,41 @@ task oci-platform:install-network
 ### Step 2. Deploy Identity Layer
 
 ```bash
+task oci-platform:generate-user-keys
 task oci-platform:install-identity
 ```
+
+`generate-user-keys` creates one API key pair for the `external-dns` user and one for the `external-secrets` user in `.keys/next/<user>/`. It creates only the pairs that are missing. It never overwrites a private key that exists.
+
+#### Upgrade from the shared API key
+
+Earlier versions gave the two users one shared API key from `.keys/oci/`. If you apply Step 2 with this version, OpenTofu deletes the shared key and creates the new keys in one apply. ExternalDNS and External Secrets then cannot authenticate until you apply Steps 6.3 and 6.4 again. To prevent this interruption, do these steps in this sequence:
+
+1. Run `task oci-platform:generate-user-keys`.
+2. Create only the new keys. The shared key stays in place:
+
+   ```bash
+   cd 02-identity
+   export TF_VAR_external_dns_next_public_key="$(cat ../.keys/next/external-dns/public.pem)"
+   export TF_VAR_external_secrets_next_public_key="$(cat ../.keys/next/external-secrets/public.pem)"
+   tofu apply \
+     -var="ci_terraform_public_key=$(cat ../.keys/ci/ci-terraform_public.pem)" \
+     -target='module.identity.oci_identity_domains_api_key.external_dns_api_key_next' \
+     -target='module.identity.oci_identity_domains_api_key.external_secrets_api_key_next'
+   ```
+
+3. Run `task oci-platform:install-external-dns` and `task oci-platform:install-external-secrets`.
+4. Restart ExternalDNS. ExternalDNS reads its configuration only when it starts. Replace `<namespace>` with the ExternalDNS namespace (the default is `external-dns`):
+
+   ```bash
+   kubectl -n <namespace> rollout restart deployment/external-dns
+   kubectl -n <namespace> rollout status deployment/external-dns
+   ```
+
+5. Make sure that all ExternalSecrets are `Ready` and that the ExternalDNS log shows no authentication error.
+6. Run `task oci-platform:install-identity`. The plan must show only the deletion of the two `external_dns_api_key` and `external_secrets_api_key` resources.
+
+A deleted API key cannot be restored. If a step fails, keep the shared key and repeat the step.
 
 #### ExternalDNS and External Secrets policies
 
@@ -95,7 +128,6 @@ task oci-platform:install-oke
 ### Step 4. Deploy DNS Module
 
 ```bash
-task oci-platform:generate-oci-keys
 task oci-platform:install-dns
 ```
 

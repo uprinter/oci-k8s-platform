@@ -32,4 +32,5 @@ module "external-dns" {
   private_key_pem     = var.oci_api_private_key
   fingerprint         = var.oci_api_private_key_fingerprint
   pod_security_labels = var.pod_security_labels
+  component_resources = var.component_resources
 }

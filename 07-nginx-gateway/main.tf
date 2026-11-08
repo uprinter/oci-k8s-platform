@@ -36,4 +36,5 @@ module "nginx-gateway" {
 
   disable_lb_security_rule_management = var.disable_lb_security_rule_management
   pod_security_labels                 = var.pod_security_labels
+  component_resources                 = var.component_resources
 }
