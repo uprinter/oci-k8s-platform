@@ -27,6 +27,7 @@ provider "kubernetes" {
 module "cert-manager" {
   source              = "../modules/cert-manager"
   pod_security_labels = var.pod_security_labels
+  component_resources = var.component_resources
 }
 
 output "issuer_name" {

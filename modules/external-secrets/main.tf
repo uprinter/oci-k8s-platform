@@ -1,3 +1,26 @@
+variable "component_resources" {
+  description = "Container requests and limits by component (keys: controller, cert-controller, webhook). Example: { requests = { cpu = \"10m\", memory = \"128Mi\" }, limits = { memory = \"512Mi\" } }. An empty map sets nothing."
+  type = map(object({
+    requests = optional(map(string), {})
+    limits   = optional(map(string), {})
+  }))
+  default = {}
+}
+
+locals {
+  resource_prefixes = {
+    controller      = "resources"
+    cert-controller = "certController.resources"
+    webhook         = "webhook.resources"
+  }
+  resource_set = flatten([
+    for comp, r in var.component_resources : concat(
+      [for k, v in r.requests : { name = "${local.resource_prefixes[comp]}.requests.${k}", value = v }],
+      [for k, v in r.limits : { name = "${local.resource_prefixes[comp]}.limits.${k}", value = v }]
+    )
+  ])
+}
+
 variable "pod_security_labels" {
   description = "Pod Security Admission labels for the namespace, for example pod-security.kubernetes.io/enforce = \"baseline\". Empty map sets no labels."
   type        = map(string)
@@ -56,6 +79,8 @@ resource "helm_release" "external_secrets" {
   version          = var.chart_version
   namespace        = var.namespace
   create_namespace = true
+
+  set = local.resource_set
 }
 
 resource "kubernetes_secret_v1" "external_secrets_config" {

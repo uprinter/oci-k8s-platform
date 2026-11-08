@@ -1,3 +1,25 @@
+variable "component_resources" {
+  description = "Container requests and limits by component (keys: controller, proxy). Example: { requests = { cpu = \"10m\", memory = \"128Mi\" }, limits = { memory = \"512Mi\" } }. An empty map sets nothing."
+  type = map(object({
+    requests = optional(map(string), {})
+    limits   = optional(map(string), {})
+  }))
+  default = {}
+}
+
+locals {
+  resource_prefixes = {
+    controller = "nginxGateway.resources"
+    proxy      = "nginx.container.resources"
+  }
+  resource_set = flatten([
+    for comp, r in var.component_resources : concat(
+      [for k, v in r.requests : { name = "${local.resource_prefixes[comp]}.requests.${k}", value = v }],
+      [for k, v in r.limits : { name = "${local.resource_prefixes[comp]}.limits.${k}", value = v }]
+    )
+  ])
+}
+
 variable "pod_security_labels" {
   description = "Pod Security Admission labels for the namespace, for example pod-security.kubernetes.io/enforce = \"baseline\". Empty map sets no labels."
   type        = map(string)
@@ -64,6 +86,8 @@ resource "helm_release" "nginx_fabric_gateway" {
   version          = var.chart_version
   namespace        = var.namespace
   create_namespace = true
+
+  set = local.resource_set
 }
 
 # Helm creates the namespace, so Terraform patches the labels onto it instead of owning it.
@@ -130,7 +154,7 @@ resource "kubernetes_manifest" "nginx_fabric_gateway_external" {
     kind       = "Gateway"
     metadata = {
       name      = "nginx-fabric-gateway-external"
-      namespace = helm_release.nginx_fabric_gateway.metadata.namespace
+      namespace = var.namespace
       annotations = {
         "cert-manager.io/cluster-issuer" = "letsencrypt-issuer"
       }
@@ -152,6 +176,8 @@ resource "kubernetes_manifest" "nginx_fabric_gateway_external" {
       listeners = concat(local.https_listeners, local.http_listeners)
     }
   }
+
+  depends_on = [helm_release.nginx_fabric_gateway]
 }
 
 resource "kubernetes_manifest" "nginx_proxy_for_internal_gateway" {
@@ -160,10 +186,18 @@ resource "kubernetes_manifest" "nginx_proxy_for_internal_gateway" {
     kind       = "NginxProxy"
     metadata = {
       name      = "nginx-proxy-for-internal-gateway"
-      namespace = helm_release.nginx_fabric_gateway.metadata.namespace
+      namespace = var.namespace
     }
     spec = {
       kubernetes = {
+        deployment = length(lookup(var.component_resources, "proxy", { requests = {}, limits = {} }).requests) + length(lookup(var.component_resources, "proxy", { requests = {}, limits = {} }).limits) > 0 ? {
+          container = {
+            resources = {
+              requests = var.component_resources["proxy"].requests
+              limits   = var.component_resources["proxy"].limits
+            }
+          }
+        } : null
         service = {
           type = "NodePort"
           nodePorts = [{
@@ -174,6 +208,8 @@ resource "kubernetes_manifest" "nginx_proxy_for_internal_gateway" {
       }
     }
   }
+
+  depends_on = [helm_release.nginx_fabric_gateway]
 }
 
 # Internal Gateway (via NodePort)
@@ -183,7 +219,7 @@ resource "kubernetes_manifest" "nginx_fabric_gateway_internal" {
     kind       = "Gateway"
     metadata = {
       name      = "nginx-fabric-gateway-internal"
-      namespace = helm_release.nginx_fabric_gateway.metadata.namespace
+      namespace = var.namespace
     }
     spec = {
       gatewayClassName = "nginx"
@@ -221,6 +257,8 @@ resource "kubernetes_manifest" "nginx_fabric_gateway_internal" {
       ]
     }
   }
+
+  depends_on = [helm_release.nginx_fabric_gateway]
 }
 
 # Internal Certificate
@@ -230,7 +268,7 @@ resource "kubernetes_manifest" "internal_certificate" {
     kind       = "Certificate"
     metadata = {
       name      = "internal-cert"
-      namespace = helm_release.nginx_fabric_gateway.metadata.namespace
+      namespace = var.namespace
     }
     spec = {
       secretName = "internal-cert"
@@ -241,6 +279,8 @@ resource "kubernetes_manifest" "internal_certificate" {
       }
     }
   }
+
+  depends_on = [helm_release.nginx_fabric_gateway]
 }
 
 # External Certificate
@@ -250,7 +290,7 @@ resource "kubernetes_manifest" "external_certificate" {
     kind       = "Certificate"
     metadata = {
       name      = "external-cert"
-      namespace = helm_release.nginx_fabric_gateway.metadata.namespace
+      namespace = var.namespace
     }
     spec = {
       secretName = "external-cert"
@@ -261,6 +301,8 @@ resource "kubernetes_manifest" "external_certificate" {
       }
     }
   }
+
+  depends_on = [helm_release.nginx_fabric_gateway]
 }
 
 resource "kubernetes_manifest" "letsencrypt_issuer" {
@@ -303,7 +345,7 @@ resource "kubernetes_manifest" "server_cert" {
     kind       = "Certificate"
     metadata = {
       name      = "server-cert"
-      namespace = helm_release.nginx_fabric_gateway.metadata.namespace
+      namespace = var.namespace
     }
     spec = {
       secretName = "server-tls"
@@ -320,6 +362,8 @@ resource "kubernetes_manifest" "server_cert" {
       }
     }
   }
+
+  depends_on = [helm_release.nginx_fabric_gateway]
 }
 
 # Nginx Gateway Fabric Agent Certificate
@@ -329,7 +373,7 @@ resource "kubernetes_manifest" "agent_cert" {
     kind       = "Certificate"
     metadata = {
       name      = "agent-cert"
-      namespace = helm_release.nginx_fabric_gateway.metadata.namespace
+      namespace = var.namespace
     }
     spec = {
       secretName = "agent-tls"
@@ -346,4 +390,6 @@ resource "kubernetes_manifest" "agent_cert" {
       }
     }
   }
+
+  depends_on = [helm_release.nginx_fabric_gateway]
 }

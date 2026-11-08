@@ -1,3 +1,26 @@
+variable "component_resources" {
+  description = "Container requests and limits by component (keys: controller, cainjector, webhook). Example: { requests = { cpu = \"10m\", memory = \"128Mi\" }, limits = { memory = \"512Mi\" } }. An empty map sets nothing."
+  type = map(object({
+    requests = optional(map(string), {})
+    limits   = optional(map(string), {})
+  }))
+  default = {}
+}
+
+locals {
+  resource_prefixes = {
+    controller = "resources"
+    cainjector = "cainjector.resources"
+    webhook    = "webhook.resources"
+  }
+  resource_set = flatten([
+    for comp, r in var.component_resources : concat(
+      [for k, v in r.requests : { name = "${local.resource_prefixes[comp]}.requests.${k}", value = v }],
+      [for k, v in r.limits : { name = "${local.resource_prefixes[comp]}.limits.${k}", value = v }]
+    )
+  ])
+}
+
 variable "pod_security_labels" {
   description = "Pod Security Admission labels for the namespace, for example pod-security.kubernetes.io/enforce = \"baseline\". Empty map sets no labels."
   type        = map(string)
@@ -25,7 +48,7 @@ resource "helm_release" "cert_manager" {
   namespace        = kubernetes_namespace.cert_manager.metadata[0].name
   create_namespace = false
 
-  set = [
+  set = concat([
     {
       name  = "config.apiVersion"
       value = "controller.config.cert-manager.io/v1alpha1"
@@ -42,7 +65,7 @@ resource "helm_release" "cert_manager" {
       name  = "crds.enabled"
       value = "true"
     }
-  ]
+  ], local.resource_set)
 }
 
 # Root Self-signed Issuer
@@ -71,11 +94,11 @@ resource "kubernetes_manifest" "root_ca_cert" {
       namespace = kubernetes_namespace.cert_manager.metadata[0].name
     }
     spec = {
-      isCA       = true
-      commonName = "Root CA"
-      secretName = "root-ca-cert"
-      duration   = "87600h" # 10 years
-      renewBefore = "8760h" # 1 year before expiry
+      isCA        = true
+      commonName  = "Root CA"
+      secretName  = "root-ca-cert"
+      duration    = "87600h" # 10 years
+      renewBefore = "8760h"  # 1 year before expiry
       privateKey = {
         algorithm = "RSA"
         size      = 2048
@@ -114,11 +137,11 @@ resource "kubernetes_manifest" "intermediate_ca_cert" {
       namespace = kubernetes_namespace.cert_manager.metadata[0].name
     }
     spec = {
-      isCA       = true
-      commonName = "Intermediate CA"
-      secretName = "intermediate-ca-cert"
-      duration   = "8760h" # 1 year
-      renewBefore = "720h" # 30 days before expiry
+      isCA        = true
+      commonName  = "Intermediate CA"
+      secretName  = "intermediate-ca-cert"
+      duration    = "8760h" # 1 year
+      renewBefore = "720h"  # 30 days before expiry
       privateKey = {
         algorithm = "RSA"
         size      = 2048
