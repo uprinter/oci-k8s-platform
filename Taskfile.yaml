@@ -218,3 +218,11 @@ tasks:
       - echo "Installing Cloud Guard..."
       - tofu init
       - tofu apply
+
+  oci-platform:install-volume-backup:
+    desc: "Step 16. Weekly backup policy for the listed block volumes"
+    dir: "16-volume-backup"
+    cmds:
+      - echo "Installing the volume backup policy..."
+      - tofu init
+      - tofu apply
