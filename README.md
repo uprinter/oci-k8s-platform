@@ -330,7 +330,7 @@ What this step creates:
 
 ### Step 8. Back up block volumes (optional)
 
-This step creates a user-defined backup policy and assigns it to the block volumes that you list. The policy makes a weekly incremental backup on Sunday at 03:00 UTC and keeps each backup for 13 days, so each volume has a maximum of two backups. This step does not need the VPN or kubeconfig.
+This step creates a user-defined backup policy and assigns it to the block volumes that you list. The policy makes an incremental backup each Sunday at 03:00 UTC and keeps it for 13 days, so each volume has two backups at most. This step does not need the VPN or kubeconfig.
 
 1. Get the OCIDs of the volumes. For a volume that a PVC provisioned, the OCID is the `volumeHandle` of its PersistentVolume.
 2. Create `16-volume-backup/backend.tf` (gitignored).

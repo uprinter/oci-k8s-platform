@@ -39,6 +39,11 @@ variable "retention_days" {
   description = "Days a scheduled backup is kept. With a weekly schedule, 13 keeps at most two backups per volume."
   type        = number
   default     = 13
+
+  validation {
+    condition     = var.retention_days >= 1 && var.retention_days < 14
+    error_message = "retention_days must be between 1 and 13. With a weekly schedule, 14 or more keeps three backups per volume."
+  }
 }
 
 resource "oci_core_volume_backup_policy" "this" {
