@@ -328,6 +328,27 @@ What this step creates:
 
 > **Rollback:** `tofu destroy` does not disable Cloud Guard, because the provider's delete for the configuration resource makes no API call. Cloud Guard stays `ENABLED`. To disable it, set `status = "DISABLED"` in `modules/cloud-guard/main.tf` and apply the stack.
 
+### Step 8. Back up block volumes (optional)
+
+This step creates a user-defined backup policy and assigns it to the block volumes that you list. The policy makes an incremental backup each Sunday at 03:00 UTC and keeps it for 13 days, so each volume has two backups at most. This step does not need the VPN or kubeconfig.
+
+1. Get the OCIDs of the volumes. For a volume that a PVC provisioned, the OCID is the `volumeHandle` of its PersistentVolume.
+2. Create `16-volume-backup/backend.tf` (gitignored).
+3. Create `16-volume-backup/terraform.tfvars` (gitignored) and set these variables:
+   - `region`: the region of the volumes.
+   - `compartment_id`: the compartment for the policy.
+   - `volume_ids`: a map from a label to a volume OCID. Do not put the OCIDs in a tracked file.
+   - `day_of_week`, `hour_of_day` and `retention_days` (optional): the defaults are `SUNDAY`, `3` and `13`.
+4. Run the task:
+
+   ```bash
+   task oci-platform:install-volume-backup
+   ```
+
+> **Note:** A new PVC gets a new volume with a new OCID. When you recreate a PVC, update `volume_ids` and apply this step again.
+
+> **Rollback:** `tofu destroy` removes the policy and its assignments. Backups that exist stay until their retention ends.
+
 ## Restrict the Load Balancer to Cloudflare (optional)
 
 By default, the shared Load Balancer accepts TCP 443 from all sources. If all your public hostnames are proxied through Cloudflare, you can accept traffic only from Cloudflare's IPv4 ranges. Two settings do this, and you must set both:

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-OpenTofu (Terraform) IaC for a Kubernetes platform on Oracle Cloud Infrastructure (OKE), sized to fit OCI's Always Free tier. The deployment is split into numbered stacks (`01-network` … `15-cloud-guard`) that must be applied **in order** — each later stack consumes OCIDs produced by earlier ones via `terraform.tfvars`.
+OpenTofu (Terraform) IaC for a Kubernetes platform on Oracle Cloud Infrastructure (OKE), sized to fit OCI's Always Free tier. The deployment is split into numbered stacks (`01-network` … `16-volume-backup`) that must be applied **in order** — each later stack consumes OCIDs produced by earlier ones via `terraform.tfvars`.
 
 ## Spec-driven development
 
@@ -48,6 +48,7 @@ task oci-platform:install-filesystem-storage-class # Step 6.6
 task oci-platform:install-block-storage-class     # Step 6.8
 task oci-platform:install-metrics-server          # Step 6.9
 task oci-platform:install-cloud-guard             # Step 7 (after 02-identity with create_cloud_guard_policy = true; needs tfvars incl. notification_email)
+task oci-platform:install-volume-backup           # Step 8 (optional; needs tfvars incl. volume_ids)
 ```
 
 Direct OpenTofu use inside a stack:
@@ -88,6 +89,7 @@ Never print a private key in a terminal, a log or a review. Plan files of stacks
 5. `05-vpn` — OpenVPN instance (optional automated path; the manual marketplace path in README is the default)
 6. `06-cert-manager` → `07-nginx-gateway` → `08-external-dns` → `09-external-secrets` → `10-gitlab-agent` → `11-filesystem-storage-class` → `12-origin-ca-issuer` → `13-block-storage-class` → `14-metrics-server` — Helm/Kubernetes workloads applied via the Helm + kubernetes Terraform providers (require kubeconfig + VPN reachability to the private API endpoint). `12-origin-ca-issuer` is optional and depends on `07` (writes the origin cert Secret into the gateway namespace) and `09` (reads the Cloudflare Origin CA token from OCI Vault via the `oci-secret-store` ClusterSecretStore).
 7. `15-cloud-guard` — Cloud Guard in detect-only mode on the root compartment. Depends only on `02-identity` (the `cloud-guard-policy`); set `create_cloud_guard_policy = true` in the `02-identity` tfvars, apply `02-identity` first, then `15-cloud-guard`. It does not need the VPN or kubeconfig.
+8. `16-volume-backup` — optional. A user-defined weekly incremental backup policy and its assignment to the block volume OCIDs in `volume_ids`. It does not depend on other stacks' outputs and does not need the VPN or kubeconfig. A recreated PVC gets a new volume OCID, so update `volume_ids` and apply again.
 
 **Secret handling.** `.gitignore` excludes `*.tfvars`, `backend.tf`, `.keys/`, and `*.tfstate*`. That means:
 - `terraform.tfvars` and `backend.tf` in each stack are local-only and contain real OCIDs / GitLab tokens / etc. Never commit them. `backend.tf.template` shows the supported backend shapes.
