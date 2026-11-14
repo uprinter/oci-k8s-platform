@@ -24,6 +24,24 @@ If a module cannot be named and described without revealing what product it serv
 
 The rule and the full boundary table are recorded in an internal architecture decision record, kept privately alongside the product this rule originated from.
 
+## Publishing to GitHub
+
+GitLab `main` is the source of truth. The public GitHub repository is an export of GitLab `main`: it holds the same files, except `specs/verify-log.md`, which names private projects and merge requests. All other tracked files go public, so the rules above apply to each of them.
+
+Make an export after each merge to GitLab `main`. Copy the tree of GitLab `main` into one new commit on a branch from GitHub `main`, then open a pull request on GitHub. Do the export in a separate worktree, so that your checkout and its uncommitted work do not change. Do not push GitLab history to GitHub, because its commit messages refer to private merge requests. Before the push, search the export diff for identifying values and private references such as `!<number>`. The founder approves each push to GitHub. With `origin` as GitLab and `upstream` as GitHub:
+
+```bash
+git fetch origin && git fetch upstream
+git worktree add -b export/<date> ../oci-export upstream/main
+cd ../oci-export
+git rm -rq . && git checkout origin/main -- .
+git rm -qf specs/verify-log.md
+git commit -m "Export GitLab main <short-sha>"
+git push upstream export/<date>
+gh pr create -R uprinter/oci-k8s-platform --base main --head export/<date>
+cd - && git worktree remove ../oci-export
+```
+
 ## Common commands
 
 All operations are driven through `Taskfile.yaml` using [Task](https://taskfile.dev/). The tasks `cd` into the correct numbered directory and run `tofu init && tofu apply` with the right variables.
@@ -43,11 +61,10 @@ task oci-platform:install-cert-manager            # Step 6.1 — requires VPN + 
 task oci-platform:install-nginx-gateway           # Step 6.2
 task oci-platform:install-external-dns            # Step 6.3 (injects the external-dns private key + fingerprint)
 task oci-platform:install-external-secrets        # Step 6.4 (two-phase apply — see below)
-task oci-platform:install-gitlab-agent            # Step 6.5
 task oci-platform:install-filesystem-storage-class # Step 6.6
 task oci-platform:install-block-storage-class     # Step 6.8
 task oci-platform:install-metrics-server          # Step 6.9
-task oci-platform:install-cloud-guard             # Step 7 (after 02-identity with create_cloud_guard_policy = true; needs tfvars incl. notification_email)
+task oci-platform:install-cloud-guard             # Step 7 (after 02-identity; needs tfvars incl. notification_email)
 task oci-platform:install-volume-backup           # Step 8 (optional; needs tfvars incl. volume_ids)
 ```
 
@@ -83,12 +100,12 @@ Never print a private key in a terminal, a log or a review. Plan files of stacks
 
 **Dependency order (do not reorder):**
 1. `01-network` — VCN, subnets (worker, api, lb, pod, vpn, fss_mount_target), NSGs, gateways
-2. `02-identity` — compartments, dynamic groups, IAM policies, including the `external-dns` and `external-secrets` technical users that each use their own public key from `.keys/next/<user>/` and the `ci-terraform` technical user that consumes the one from `.keys/ci/`, and, only when `create_cloud_guard_policy = true` (default `false`), the `cloud-guard-policy` for the Cloud Guard service. `least_privilege_dns_and_secrets_policies` (default `false`) selects the statements of `external-dns-policy` and `external-secrets-policy`; see "ExternalDNS and External Secrets policies" below
+2. `02-identity` — compartments, dynamic groups, IAM policies, including the `external-dns` and `external-secrets` technical users that each use their own public key from `.keys/next/<user>/` and the `ci-terraform` technical user that consumes the one from `.keys/ci/`, and the `cloud-guard-policy` for the Cloud Guard service
 3. `03-oke` — OKE cluster + node pool + KMS vault for external-secrets; outputs `oke_external_secrets_vault_ocid`
 4. `04-dns` — OCI DNS zones
 5. `05-vpn` — OpenVPN instance (optional automated path; the manual marketplace path in README is the default)
-6. `06-cert-manager` → `07-nginx-gateway` → `08-external-dns` → `09-external-secrets` → `10-gitlab-agent` → `11-filesystem-storage-class` → `12-origin-ca-issuer` → `13-block-storage-class` → `14-metrics-server` — Helm/Kubernetes workloads applied via the Helm + kubernetes Terraform providers (require kubeconfig + VPN reachability to the private API endpoint). `12-origin-ca-issuer` is optional and depends on `07` (writes the origin cert Secret into the gateway namespace) and `09` (reads the Cloudflare Origin CA token from OCI Vault via the `oci-secret-store` ClusterSecretStore).
-7. `15-cloud-guard` — Cloud Guard in detect-only mode on the root compartment. Depends only on `02-identity` (the `cloud-guard-policy`); set `create_cloud_guard_policy = true` in the `02-identity` tfvars, apply `02-identity` first, then `15-cloud-guard`. It does not need the VPN or kubeconfig.
+6. `06-cert-manager` → `07-nginx-gateway` → `08-external-dns` → `09-external-secrets` → `11-filesystem-storage-class` → `12-origin-ca-issuer` → `13-block-storage-class` → `14-metrics-server` — Helm/Kubernetes workloads applied via the Helm + kubernetes Terraform providers (require kubeconfig + VPN reachability to the private API endpoint). `12-origin-ca-issuer` is optional and depends on `07` (writes the origin cert Secret into the gateway namespace) and `09` (reads the Cloudflare Origin CA token from OCI Vault via the `oci-secret-store` ClusterSecretStore).
+7. `15-cloud-guard` — Cloud Guard in detect-only mode on the root compartment. Depends only on `02-identity` (the `cloud-guard-policy`); apply `02-identity` first, then `15-cloud-guard`. It does not need the VPN or kubeconfig.
 8. `16-volume-backup` — optional. A user-defined weekly incremental backup policy and its assignment to the block volume OCIDs in `volume_ids`. It does not depend on other stacks' outputs and does not need the VPN or kubeconfig. A recreated PVC gets a new volume OCID, so update `volume_ids` and apply again.
 
 **Secret handling.** `.gitignore` excludes `*.tfvars`, `backend.tf`, `.keys/`, and `*.tfstate*`. That means:
@@ -96,15 +113,13 @@ Never print a private key in a terminal, a log or a review. Plan files of stacks
 - The API keys of the `external-dns` and `external-secrets` technical users (one pair each), the CI API key, and the SSH keys live in `.keys/next/<user>/`, `.keys/ci/`, and `.keys/ssh/` and are injected at apply time via `-var=` from the Taskfile — never baked into tfvars.
 - When adding a new stack, also create its own `backend.tf` (gitignored) and `terraform.tfvars` (gitignored).
 
-**DNS zone scope and public record ownership (`04`, `07`, `08`).** `modules/dns` creates both the internal and the external zone with `scope = "PRIVATE"`; only names listed in `public_dns_zones` get a `GLOBAL` zone. A deployment that leaves `public_zone_names = []` therefore has no public OCI zone at all, and both wildcard zones resolve only inside the VCN. The external zone is "external" because its Gateway sits behind the public Load Balancer, not because its names resolve on the internet. With no OCI zone for a public name, external-dns cannot create its record here at all — so a public name reaching this platform is never served by a record this repo owns. Each public record is instead owned by the edge/CDN provider fronting it and lives in that provider's own IaC repo — look there, not here, when a public name resolves to an unexpected address.
-
-**ExternalDNS and External Secrets policies (`02`).** With `least_privilege_dns_and_secrets_policies = false` (the default), `external-dns-policy` grants `read dns-zones` + `manage dns` and `external-secrets-policy` grants `use vaults` + `manage keys` + `manage secret-family`; these statements must stay byte-identical so that existing deployments plan no change. With `true`, they grant `use dns-zones` + `manage dns-records` and `read vaults` + `read secret-bundles`. The narrow set supports ExternalDNS record create/update/delete through `ListZones`, `GetZoneRecords` and `PatchZoneRecords` (`PatchZoneRecords` needs `DNS_ZONE_UPDATE` and `DNS_RECORD_UPDATE`), and read-only External Secrets access through `GetSecretBundleByName` (`SECRET_BUNDLE_READ`) and `GetVault` (`VAULT_READ`). It does not support `PushSecret` or other secret write-back, key management (the old `manage keys` right), `dataFrom.find` (looking up secrets by name or tag through `ListSecrets`), or ExternalDNS management of zones, views or other DNS resource types. The flag switches only the `statements` list; resource addresses do not change and the apply order is not affected. To roll back, set the flag to `false` and apply `02-identity`.
+**DNS zone scope and public record ownership (`04`, `07`, `08`).** `modules/dns` creates the internal zone with `scope = "PRIVATE"`; only names listed in `public_dns_zones` get a `GLOBAL` zone. A deployment that leaves `public_zone_names = []` therefore has no public OCI zone at all, and the internal wildcard zone resolves only inside the VCN. The external Gateway has no OCI zone: each of its listeners is a public hostname from `public_hosted_zone_records`. With no OCI zone for a public name, external-dns cannot create its record here at all — so a public name reaching this platform is never served by a record this repo owns. Each public record is instead owned by the edge/CDN provider fronting it and lives in that provider's own IaC repo — look there, not here, when a public name resolves to an unexpected address.
 
 **Two-phase apply for `09-external-secrets`.** The Taskfile first runs `tofu apply -exclude="module.external-secrets.kubernetes_manifest.oci_secret_store"` and then a second unrestricted `tofu apply`. This is intentional: the `ClusterSecretStore` CRD doesn't exist until the External Secrets Operator chart is installed, so the manifest must be applied on a second pass. Preserve this pattern when editing that task.
 
 **Two-phase apply for `12-origin-ca-issuer`.** Same pattern, same reason. The Cloudflare origin-ca-issuer Helm chart does not ship its CRDs, and the `ClusterOriginIssuer`/`Certificate`/`ExternalSecret` custom resources can't be planned until their CRDs exist. `task oci-platform:install-origin-ca-issuer` first runs `tofu apply` with `-exclude` on `module.origin-ca-issuer.kubernetes_manifest.{origin_ca_token,cluster_origin_issuer,origin_certificate}` (installs namespace + CRDs + chart), then a second unrestricted `tofu apply` (creates the CRs). Preserve this two-pass structure when editing that task. Note: `modules/origin-ca-issuer` uses `data "http"` (needs the `hashicorp/http` provider, already wired into `12-origin-ca-issuer`) to fetch the issuer CRDs at plan time.
 
-**Load Balancer exposure (`01`, `07`).** By default the shared Load Balancer NSG keeps its world-open `:443` ingress rule and the cloud controller manager manages the Load Balancer security rules. Restriction is opt-in and needs two settings together: `lb_ingress_source_cidrs` in `01-network` (one `lb_ingress` NSG rule per CIDR) and `disable_lb_security_rule_management` in `07-nginx-gateway` (adds `oci.oraclecloud.com/security-rule-management-mode: "None"` to the external Gateway). When `lb_ingress_source_cidrs` does not contain `0.0.0.0/0`, `modules/network` also adopts the VCN default security list through `oci_core_default_security_list` with only the LB-subnet-to-worker node-port rules, so a plan reverts any rule added outside OpenTofu. Apply `07-nginx-gateway` before `01-network` when either change is new, or the controller can write a world-open rule again before the annotation is live. The `moved` block in `modules/network` maps the old single `lb_ingress` rule to the `0.0.0.0/0` key, so the default produces no plan diff.
+**Load Balancer exposure (`01`, `07`).** The shared Load Balancer accepts TCP 443 only from Cloudflare's IPv4 ranges, pinned in `01-network/main.tf` as `local.cloudflare_ipv4_cidrs`. A `check` block compares the list with the Cloudflare API on every plan and warns when they differ; update the list and apply `01-network` when it warns. `modules/network` adopts the VCN default security list through `oci_core_default_security_list`, so a plan reverts any rule added outside OpenTofu. The external Gateway sets `oci.oraclecloud.com/security-rule-management-mode: "None"`, so the cloud controller manager does not write listener rules into that list. Apply `07-nginx-gateway` before `01-network` when either change is new, or the controller can write a world-open rule again before the annotation is live.
 
 **Worker node shape and capacity type (`03`).** `node_ocpus` / `node_memory_in_gbs` and `use_preemptible_nodes` are node pool *template* properties: OKE applies them only to worker nodes created after the change. Applying `03-oke` therefore updates the node pool record and leaves every running node exactly as it was — the apply succeeds while nothing observable changes. Making a shape or capacity-type change take effect requires terminating the existing node(s) so the pool recreates them from the new template. On a single-node cluster that is a full-cluster outage, so treat it as a deliberate, scheduled operation rather than a side effect of `tofu apply`. `use_preemptible_nodes` defaults to `false` here and is switched on only via the gitignored `terraform.tfvars`.
 
@@ -116,7 +131,7 @@ Never print a private key in a terminal, a log or a review. Plan files of stacks
 
 **Cloud Guard stack (`15`), detect-only.** `modules/cloud-guard` enables Cloud Guard, targets the root compartment with the Oracle-managed Configuration, Activity and Threat detector recipes only (no Instance Security or Container Security recipe), and attaches a clone of the Oracle responder recipe in which every rule is disabled except `EVENT`. `EVENT` only publishes a problem to the Events service; an Events rule sends problems of the risk levels in `min_risk_levels` (default `CRITICAL`, `HIGH`; empty list means all) to a Notifications topic with one email subscription. Keep this detect-only rule: never enable a remediation responder rule and never grant the `cloudguard` service a `manage` statement other than the managed `cloudevents-rules` one in `cloud-guard-policy`. Postconditions on the clone fail the apply if the Oracle recipe has a rule that `local.responder_rules` does not list, or if any rule other than `EVENT` is enabled. `notification_email` is sensitive, has no default and is set only in the gitignored `terraform.tfvars`; after the first apply the recipient must click the confirmation link in the email from OCI Notifications, or no email is sent. The stack must run with `region` equal to `reporting_region`.
 
-**Cloud Guard rollback.** `tofu destroy` on `15-cloud-guard` does not disable Cloud Guard: the provider's delete for `oci_cloud_guard_cloud_guard_configuration` is a no-op, so it only removes the resource from state and Cloud Guard stays `ENABLED`. To roll back, set `status = "DISABLED"` on `oci_cloud_guard_cloud_guard_configuration` in `modules/cloud-guard`, apply, and only then destroy the stack if required.
+**Cloud Guard rollback.** `tofu destroy` on `15-cloud-guard` does not disable Cloud Guard: deleting the configuration resource only removes it from state and Cloud Guard stays `ENABLED`. To roll back, set `status = "DISABLED"` on `oci_cloud_guard_cloud_guard_configuration` in `modules/cloud-guard`, apply, and only then destroy the stack if required.
 
 **Provider auth.** All OCI providers use `auth = "SecurityToken"` with `config_file_profile = "DEFAULT"` — run `task oci:login` (`oci session authenticate`) before any apply. Region defaults to `eu-frankfurt-1` in `terraform.tfvars`.
 

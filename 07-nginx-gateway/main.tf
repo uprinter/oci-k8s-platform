@@ -30,11 +30,8 @@ module "nginx-gateway" {
   issuer_name             = var.issuer_name
   issuer_kind             = var.issuer_kind
   internal_dns_zone       = var.internal_hosted_zone_name
-  external_dns_zone       = var.external_hosted_zone_name
   public_dns_zone_records = var.public_hosted_zone_records
   acme_registration_email = var.acme_registration_email
-
-  disable_lb_security_rule_management = var.disable_lb_security_rule_management
-  pod_security_labels                 = var.pod_security_labels
-  component_resources                 = var.component_resources
+  pod_security_labels     = var.pod_security_labels
+  component_resources     = var.component_resources
 }

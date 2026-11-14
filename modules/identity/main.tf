@@ -17,23 +17,6 @@ variable "ci_terraform_public_key" {
   type        = string
 }
 
-variable "approved_sender_emails" {
-  type    = list(string)
-  default = []
-}
-
-variable "create_cloud_guard_policy" {
-  description = "Create the IAM policy that the Cloud Guard service needs. Set it to true before you apply the 15-cloud-guard stack."
-  type        = bool
-  default     = false
-}
-
-variable "least_privilege_dns_and_secrets_policies" {
-  description = "Grant the ExternalDNS and ExternalSecrets users only the rights their documented operations need. The default keeps the broader rights, which also cover writing secrets back to the vault, managing keys and managing DNS zones and views."
-  type        = bool
-  default     = false
-}
-
 variable "technical_users_domain_name" { type = string }
 variable "technical_users_domain_url" { type = string }
 
@@ -51,8 +34,6 @@ resource "oci_identity_policy" "network_path_analyzer_policy" {
 }
 
 resource "oci_identity_policy" "cloud_guard_policy" {
-  count = var.create_cloud_guard_policy ? 1 : 0
-
   compartment_id = var.compartment_id
   name           = "cloud-guard-policy"
   description    = "Policy for the Cloud Guard service"
@@ -149,12 +130,9 @@ resource "oci_identity_policy" "external_dns_policy" {
   compartment_id = var.compartment_id
   name           = "external-dns-policy"
   description    = "Policy for ExternalDNS"
-  statements = var.least_privilege_dns_and_secrets_policies ? [
+  statements = [
     "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.external_dns_group.display_name}' to use dns-zones in compartment id ${var.compartment_id}",
-    "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.external_dns_group.display_name}' to manage dns-records in compartment id ${var.compartment_id}"
-    ] : [
-    "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.external_dns_group.display_name}' to read dns-zones in compartment id ${var.compartment_id}",
-    "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.external_dns_group.display_name}' to manage dns in compartment id ${var.compartment_id}"
+    "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.external_dns_group.display_name}' to use dns-records in compartment id ${var.compartment_id}"
   ]
 }
 
@@ -210,13 +188,9 @@ resource "oci_identity_policy" "external_secrets_policy" {
   compartment_id = var.compartment_id
   name           = "external-secrets-policy"
   description    = "Policy for ExternalSecrets"
-  statements = var.least_privilege_dns_and_secrets_policies ? [
+  statements = [
     "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.external_secrets_group.display_name}' to read vaults in compartment id ${var.compartment_id}",
     "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.external_secrets_group.display_name}' to read secret-bundles in compartment id ${var.compartment_id}"
-    ] : [
-    "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.external_secrets_group.display_name}' to use vaults in compartment id ${var.compartment_id}",
-    "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.external_secrets_group.display_name}' to manage keys in compartment id ${var.compartment_id}",
-    "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.external_secrets_group.display_name}' to manage secret-family in compartment id ${var.compartment_id}"
   ]
 }
 
@@ -232,52 +206,6 @@ resource "oci_identity_policy" "oke_fss_csi_policy" {
     "Allow any-user to manage file-family in compartment id ${var.compartment_id} where request.principal.type = 'cluster'",
     "Allow any-user to use virtual-network-family in compartment id ${var.compartment_id} where request.principal.type = 'cluster'"
   ]
-}
-
-resource "oci_identity_domains_user" "email_sender_user" {
-  idcs_endpoint = var.technical_users_domain_url
-  schemas = [
-    "urn:ietf:params:scim:schemas:core:2.0:User",
-    "urn:ietf:params:scim:schemas:oracle:idcs:extension:userState:User",
-    "urn:ietf:params:scim:schemas:oracle:idcs:extension:OCITags",
-    "urn:ietf:params:scim:schemas:oracle:idcs:extension:capabilities:User",
-    "urn:ietf:params:scim:schemas:oracle:idcs:extension:user:User"
-  ]
-  user_name = "email-sender"
-  name {
-    family_name = "EmailSender"
-  }
-}
-
-resource "oci_identity_domains_group" "email_sender_group" {
-  display_name   = "Email Senders"
-  idcs_endpoint  = var.technical_users_domain_url
-  attribute_sets = ["all"]
-  schemas = [
-    "urn:ietf:params:scim:schemas:core:2.0:Group",
-    "urn:ietf:params:scim:schemas:oracle:idcs:extension:OCITags",
-    "urn:ietf:params:scim:schemas:oracle:idcs:extension:group:Group",
-  ]
-
-  members {
-    value = oci_identity_domains_user.email_sender_user.id
-    type  = "User"
-  }
-}
-
-resource "oci_identity_policy" "email_sender_policy" {
-  compartment_id = var.compartment_id
-  name           = "email-sender-policy"
-  description    = "Policy for Email Sender"
-  statements = [
-    "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.email_sender_group.display_name}' to use email-family in compartment id ${var.compartment_id}"
-  ]
-}
-
-resource "oci_email_sender" "approved_sender" {
-  for_each       = toset(var.approved_sender_emails)
-  compartment_id = var.compartment_id
-  email_address  = each.value
 }
 
 resource "oci_identity_domains_user" "ci_terraform_user" {
@@ -325,14 +253,13 @@ resource "oci_identity_domains_group" "ci_terraform_group" {
 resource "oci_identity_policy" "ci_terraform_policy" {
   compartment_id = var.compartment_id
   name           = "ci-terraform-policy"
-  description    = "Policy for the CI technical user that applies Object Storage and Email Delivery stacks"
+  description    = "Policy for the CI technical user that applies Object Storage stacks"
   statements = [
     "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.ci_terraform_group.display_name}' to read objectstorage-namespaces in tenancy",
     # PAR_MANAGE and RETENTION_RULE_* are excluded: a pre-authenticated request
     # created on a bucket would grant object-level read, which this identity is
     # otherwise denied.
-    "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.ci_terraform_group.display_name}' to manage buckets in compartment id ${var.compartment_id} where any {request.permission='BUCKET_INSPECT', request.permission='BUCKET_READ', request.permission='BUCKET_UPDATE', request.permission='BUCKET_CREATE', request.permission='BUCKET_DELETE'}",
-    "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.ci_terraform_group.display_name}' to manage email-family in compartment id ${var.compartment_id}"
+    "Allow group '${var.technical_users_domain_name}'/'${oci_identity_domains_group.ci_terraform_group.display_name}' to manage buckets in compartment id ${var.compartment_id} where any {request.permission='BUCKET_INSPECT', request.permission='BUCKET_READ', request.permission='BUCKET_UPDATE', request.permission='BUCKET_CREATE', request.permission='BUCKET_DELETE'}"
   ]
 }
 

@@ -47,20 +47,14 @@ variable "internal_dns_zone" {
   type        = string
 }
 
-variable "external_dns_zone" {
-  description = "The external DNS zone for the external gateway"
-  type        = string
-}
-
 variable "public_dns_zone_records" {
-  description = "The public DNS zone records for the external gateway"
+  description = "The public hostnames served by the external gateway, one HTTPS listener each"
   type        = list(string)
-}
 
-variable "disable_lb_security_rule_management" {
-  description = "Set the external Gateway's Load Balancer annotation security-rule-management-mode to None, so the cloud controller manager writes no security rules. Use it together with a restricted lb_ingress_source_cidrs in the network stack."
-  type        = bool
-  default     = false
+  validation {
+    condition     = length(var.public_dns_zone_records) > 0
+    error_message = "The external gateway needs at least one public hostname: a Gateway must have one or more listeners."
+  }
 }
 
 variable "acme_registration_email" {
@@ -107,14 +101,12 @@ resource "kubernetes_labels" "pod_security" {
 }
 
 locals {
-  all_dns_zones = concat([var.external_dns_zone], var.public_dns_zone_records)
-
   https_listeners = [
-    for idx, zone in local.all_dns_zones : {
+    for idx, zone in var.public_dns_zone_records : {
       name     = "https-${idx + 1}"
       port     = 443
       protocol = "HTTPS"
-      hostname = idx == 0 ? "*.${zone}" : zone
+      hostname = zone
       allowedRoutes = {
         namespaces = {
           from = "All"
@@ -125,23 +117,9 @@ locals {
         certificateRefs = [
           {
             kind = "Secret"
-            name = idx == 0 ? kubernetes_manifest.external_certificate.manifest.metadata.name : "${replace(zone, ".", "-")}-cert"
+            name = "${replace(zone, ".", "-")}-cert"
           }
         ]
-      }
-    }
-  ]
-
-  http_listeners = [
-    for idx, zone in var.public_dns_zone_records : {
-      name     = "http-${idx + 1}"
-      port     = 80
-      protocol = "HTTP"
-      hostname = zone
-      allowedRoutes = {
-        namespaces = {
-          from = "All"
-        }
       }
     }
   ]
@@ -155,25 +133,19 @@ resource "kubernetes_manifest" "nginx_fabric_gateway_external" {
     metadata = {
       name      = "nginx-fabric-gateway-external"
       namespace = var.namespace
-      annotations = {
-        "cert-manager.io/cluster-issuer" = "letsencrypt-issuer"
-      }
     }
     spec = {
       gatewayClassName = "nginx"
       infrastructure = {
-        annotations = merge(
-          {
-            "external-dns.alpha.kubernetes.io/hostname"                   = "*.${var.external_dns_zone}"
-            "service.beta.kubernetes.io/oci-load-balancer-shape"          = "flexible"
-            "service.beta.kubernetes.io/oci-load-balancer-shape-flex-min" = "10"
-            "service.beta.kubernetes.io/oci-load-balancer-shape-flex-max" = "50"
-            "oci.oraclecloud.com/oci-network-security-groups"             = var.lb_sg_id
-          },
-          var.disable_lb_security_rule_management ? { "oci.oraclecloud.com/security-rule-management-mode" = "None" } : {},
-        )
+        annotations = {
+          "service.beta.kubernetes.io/oci-load-balancer-shape"          = "flexible"
+          "service.beta.kubernetes.io/oci-load-balancer-shape-flex-min" = "10"
+          "service.beta.kubernetes.io/oci-load-balancer-shape-flex-max" = "50"
+          "oci.oraclecloud.com/oci-network-security-groups"             = var.lb_sg_id
+          "oci.oraclecloud.com/security-rule-management-mode"           = "None"
+        }
       }
-      listeners = concat(local.https_listeners, local.http_listeners)
+      listeners = local.https_listeners
     }
   }
 
@@ -273,28 +245,6 @@ resource "kubernetes_manifest" "internal_certificate" {
     spec = {
       secretName = "internal-cert"
       dnsNames   = ["*.${var.internal_dns_zone}"]
-      issuerRef = {
-        name = var.issuer_name
-        kind = var.issuer_kind
-      }
-    }
-  }
-
-  depends_on = [helm_release.nginx_fabric_gateway]
-}
-
-# External Certificate
-resource "kubernetes_manifest" "external_certificate" {
-  manifest = {
-    apiVersion = "cert-manager.io/v1"
-    kind       = "Certificate"
-    metadata = {
-      name      = "external-cert"
-      namespace = var.namespace
-    }
-    spec = {
-      secretName = "external-cert"
-      dnsNames   = ["*.${var.external_dns_zone}"]
       issuerRef = {
         name = var.issuer_name
         kind = var.issuer_kind

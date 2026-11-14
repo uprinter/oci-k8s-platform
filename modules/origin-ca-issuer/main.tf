@@ -70,7 +70,7 @@ variable "certificate_namespace" {
 }
 
 variable "certificate_name" {
-  description = "Name of the Certificate resource AND its target Secret. MUST equal the secret name the nginx-gateway listener expects (replace(host, \".\", \"-\") + \"-cert\"). This exact-name alignment is what makes cert-manager's gateway-shim back off — see module notes. Required, no default: this repo is public and the value is domain-derived."
+  description = "Name of the Certificate resource AND its target Secret. MUST equal the secret name the nginx-gateway listener expects (replace(host, \".\", \"-\") + \"-cert\"). The external Gateway has no cert-manager issuer annotation, so cert-manager's Gateway shim issues no other certificate for the listener. Required, no default: this repo is public and the value is domain-derived."
   type        = string
 }
 
@@ -212,17 +212,11 @@ resource "kubernetes_manifest" "cluster_origin_issuer" {
 # Origin certificate for the shared LB edge.
 #
 # IMPORTANT — name alignment is load-bearing:
-# The nginx-gateway external Gateway carries a cluster-wide
-# cert-manager.io/cluster-issuer=letsencrypt-issuer annotation. cert-manager's
-# gateway-shim (pkg/controller/certificate-shim/sync.go) builds one Certificate
-# per TLS listener whose resource NAME equals the listener's secretName, and it
-# looks up an existing Certificate via Get(secretName). Because THIS Certificate
-# is named exactly var.certificate_name (== the secretName the listener expects)
-# and has no controller ownerReference, the shim finds it, sees it is not owned,
-# logs "refusing to update non-owned certificate resource", and backs off — it
-# does NOT create a competing letsencrypt/HTTP-01 Certificate for the same
-# secret. Renaming this resource away from the secretName would break that
-# back-off and cause a duplicate HTTP-01 cert to fight over the Secret.
+# The origin certificate has the same name as its target Secret, and that name
+# must equal the Secret the external Gateway listener references
+# (replace(hostname, ".", "-") + "-cert" in modules/nginx-gateway). The external
+# Gateway has no cert-manager issuer annotation, so cert-manager's Gateway shim
+# issues no other certificate for the listener.
 resource "kubernetes_manifest" "origin_certificate" {
   manifest = {
     apiVersion = "cert-manager.io/v1"

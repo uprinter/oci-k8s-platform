@@ -13,18 +13,13 @@ variable "dns_listener_address" {
 }
 
 variable "lb_ingress_source_cidrs" {
-  description = "IPv4 CIDRs allowed to reach the shared Load Balancer on TCP 443. The default keeps the Load Balancer open to the internet. A list without 0.0.0.0/0 also adopts the VCN default security list and removes its world-open rules."
+  description = "IPv4 CIDRs allowed to reach the shared Load Balancer on TCP 443."
   type        = set(string)
-  default     = ["0.0.0.0/0"]
 
   validation {
     condition     = length(var.lb_ingress_source_cidrs) > 0 && alltrue([for c in var.lb_ingress_source_cidrs : can(cidrnetmask(c))])
     error_message = "lb_ingress_source_cidrs must hold at least one valid IPv4 CIDR."
   }
-}
-
-locals {
-  lb_ingress_restricted = !contains(var.lb_ingress_source_cidrs, "0.0.0.0/0")
 }
 
 data "oci_core_services" "all_services" {}
@@ -36,14 +31,11 @@ resource "oci_core_vcn" "k8s_vcn" {
   dns_label      = "k8svcn"
 }
 
-# Only when the Load Balancer is restricted: every subnet without explicit
-# security_list_ids uses this list, so it is adopted to keep it free of
-# world-open rules, and the NSGs carry the real policy. depends_on keeps the old
-# world-open :443 rule in place until the new LB ingress rules exist, so the
-# apply never blocks the allowed sources.
+# Every subnet without explicit security_list_ids uses this list, so it is
+# adopted here to keep it free of world-open rules. The NSGs carry the real
+# policy. depends_on keeps the old world-open :443 rule in place until the new
+# LB ingress rules exist, so the apply never blocks the allowed sources.
 resource "oci_core_default_security_list" "k8s_vcn" {
-  count = local.lb_ingress_restricted ? 1 : 0
-
   manage_default_resource_id = oci_core_vcn.k8s_vcn.default_security_list_id
   compartment_id             = var.compartment_id
   display_name               = "Default Security List for k8s_vcn"
@@ -584,11 +576,6 @@ resource "oci_core_network_security_group_security_rule" "worker_ingress_path_di
   }
 }
 
-moved {
-  from = oci_core_network_security_group_security_rule.lb_ingress
-  to   = oci_core_network_security_group_security_rule.lb_ingress["0.0.0.0/0"]
-}
-
 # Load balancer to worker nodes node ports.
 resource "oci_core_network_security_group_security_rule" "worker_ingress_lb" {
   network_security_group_id = oci_core_network_security_group.k8s_worker_nsg.id
@@ -777,7 +764,7 @@ resource "oci_core_network_security_group_security_rule" "lb_ingress" {
   for_each = var.lb_ingress_source_cidrs
 
   network_security_group_id = oci_core_network_security_group.k8s_lb_nsg.id
-  description               = "Allow load balancer to communicate with worker nodes."
+  description               = "Allow HTTPS to the load balancer from an allowed source."
   direction                 = "INGRESS"
   protocol                  = "6" // TCP
   source                    = each.value
@@ -935,6 +922,25 @@ resource "oci_core_network_security_group_security_rule" "pod_egress_internet_ht
     destination_port_range {
       min = 80
       max = 80
+    }
+  }
+}
+
+# Allow pods to submit mail to external SMTP relays over implicit TLS (465)
+# and STARTTLS submission (587). Port 25 stays closed.
+resource "oci_core_network_security_group_security_rule" "pod_egress_smtp_submission" {
+  for_each = toset(["465", "587"])
+
+  network_security_group_id = oci_core_network_security_group.k8s_pod_nsg.id
+  description               = "Allow pods to submit mail to external SMTP relays on TCP ${each.value}."
+  direction                 = "EGRESS"
+  protocol                  = "6" // TCP
+  destination               = "0.0.0.0/0"
+  destination_type          = "CIDR_BLOCK"
+  tcp_options {
+    destination_port_range {
+      min = tonumber(each.value)
+      max = tonumber(each.value)
     }
   }
 }

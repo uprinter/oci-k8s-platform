@@ -21,7 +21,7 @@ variable "nginx_gateway_namespace" {
 }
 
 variable "origin_certificate_secret_name" {
-  description = "Name of the origin Certificate resource and its Secret. cert-manager's gateway-shim backs off from a listener's auto-managed cert only when a Certificate resource already exists with the EXACT name the listener's TLS certificateRef expects (see modules/nginx-gateway: derived as replace(hostname, \".\", \"-\") + \"-cert\" for each entry in public_hosted_zone_records). This value MUST match that derivation for whichever hostname is being onboarded — set via terraform.tfvars (gitignored), no public default."
+  description = "Name of the origin Certificate resource and its Secret. It MUST equal the Secret name the external Gateway listener's TLS certificateRef expects (see modules/nginx-gateway: derived as replace(hostname, \".\", \"-\") + \"-cert\" for each entry in public_hosted_zone_records) for the hostname being onboarded. The external Gateway has no cert-manager issuer annotation, so cert-manager's Gateway shim issues no other certificate for the listener. Set via terraform.tfvars (gitignored), no public default."
   type        = string
 }
 
@@ -33,5 +33,9 @@ variable "origin_certificate_dns_names" {
 variable "pod_security_labels" {
   description = "Pod Security Admission labels for the namespace. Empty map sets no labels."
   type        = map(string)
-  default     = {}
+  default = {
+    "pod-security.kubernetes.io/enforce" = "baseline"
+    "pod-security.kubernetes.io/warn"    = "restricted"
+    "pod-security.kubernetes.io/audit"   = "restricted"
+  }
 }

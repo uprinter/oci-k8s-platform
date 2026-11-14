@@ -1,7 +1,6 @@
 variable "compartment_id" { type = string }
 variable "vcn_id" { type = string }
 variable "internal_dns_zone" { type = string }
-variable "external_dns_zone" { type = string }
 variable "public_dns_zones" { type = list(string) }
 
 data "oci_core_vcn_dns_resolver_association" "vcn_dns_resolver_association" {
@@ -24,14 +23,6 @@ resource "oci_dns_resolver" "resolver" {
 resource "oci_dns_zone" "internal_dns_zone" {
   compartment_id = var.compartment_id
   name           = var.internal_dns_zone
-  zone_type      = "PRIMARY"
-  scope          = "PRIVATE"
-  view_id        = oci_dns_view.private_view.id
-}
-
-resource "oci_dns_zone" "external_dns_zone" {
-  compartment_id = var.compartment_id
-  name           = var.external_dns_zone
   zone_type      = "PRIMARY"
   scope          = "PRIVATE"
   view_id        = oci_dns_view.private_view.id

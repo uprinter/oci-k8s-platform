@@ -23,10 +23,6 @@ module "identity" {
   ci_terraform_public_key          = var.ci_terraform_public_key
   technical_users_domain_url       = var.technical_users_domain_url
   technical_users_domain_name      = var.technical_users_domain_name
-  approved_sender_emails           = var.approved_sender_emails
-  create_cloud_guard_policy        = var.create_cloud_guard_policy
-
-  least_privilege_dns_and_secrets_policies = var.least_privilege_dns_and_secrets_policies
 }
 
 output "technical_users_domain_url" {
@@ -61,10 +57,10 @@ output "ci_terraform_api_key_fingerprint" {
 
 output "external_dns_next_api_key_fingerprint" {
   value       = module.identity.external_dns_next_api_key_fingerprint
-  description = "Fingerprint of the external-dns user API key (null when none)"
+  description = "Fingerprint of the second external-dns API key (null when none)"
 }
 
 output "external_secrets_next_api_key_fingerprint" {
   value       = module.identity.external_secrets_next_api_key_fingerprint
-  description = "Fingerprint of the external-secrets user API key (null when none)"
+  description = "Fingerprint of the second external-secrets API key (null when none)"
 }

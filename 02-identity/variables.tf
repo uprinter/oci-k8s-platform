@@ -23,24 +23,6 @@ variable "technical_users_domain_name" {
   type        = string
 }
 
-variable "approved_sender_emails" {
-  description = "List of email addresses to be approved senders"
-  type        = list(string)
-  default     = []
-}
-
-variable "create_cloud_guard_policy" {
-  description = "Create the IAM policy for the Cloud Guard service. Set it to true before you apply 15-cloud-guard"
-  type        = bool
-  default     = false
-}
-
-variable "least_privilege_dns_and_secrets_policies" {
-  description = "Grant the ExternalDNS and ExternalSecrets users only the rights their documented operations need. The default keeps the broader rights, which also cover writing secrets back to the vault, managing keys and managing DNS zones and views."
-  type        = bool
-  default     = false
-}
-
 variable "external_dns_next_public_key" {
   description = "PEM public key for the API key of the external-dns user. Null creates no key."
   type        = string
