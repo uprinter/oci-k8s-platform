@@ -6,6 +6,52 @@ Kubernetes setup on Oracle Cloud Infrastructure (OCI) using **Always Free** tier
 
 I wanted to run my side projects in production without paying for a cloud. So I built the platform the way I build them at work: every layer as code, the Kubernetes API reachable only through VPN, TLS and DNS handled by the cluster itself. My personal site and side projects run on it today. An AI agent team maintains it, and every change goes through a reviewed merge request.
 
+## Set up with an AI agent
+
+Give the prompt below to your coding agent, for example Claude Code or Codex. The agent asks you for each value and waits for your approval before each apply.
+
+```text
+Set up the infrastructure from https://github.com/uprinter/oci-k8s-platform in my own OCI account.
+
+Rules:
+- Use only the files in the repository. Do not use your memory of this project.
+- If README.md and Taskfile.yaml disagree, follow Taskfile.yaml. Tell me about each difference.
+- Never invent a value. Ask me for each value that is specific to my environment.
+- Write these values only into the terraform.tfvars file of each stack. These files are gitignored.
+- Never commit or push terraform.tfvars, backend.tf, state files or the .keys directory.
+- Never show the content of a private key.
+- Never use -auto-approve. Never apply without my explicit "yes" for that apply.
+- If a command fails, stop. Show me the error and wait. Do not try a workaround.
+- Do not use the OCI Console for me. If a step needs the Console, tell me what to do and wait.
+- Ask me before you change a file outside the repository.
+
+Procedure:
+1. Clone the repository. Read README.md, Taskfile.yaml and the variables.tf file of each stack.
+2. Check the items in the README section "Prerequisites":
+   - The tools task, tofu, oci, kubectl, openssl and an OpenVPN client are installed.
+   - An OCI CLI profile exists. The OCI stacks use the DEFAULT profile with a session token. If no valid session exists, ask me to run "task oci:login".
+   - An SSH key pair is available.
+   - Each stack that I want has a backend.tf file. The examples are in backend.tf.template.
+3. If an item is missing, stop. Give me one list of all missing items.
+4. Ask me which optional steps I want: Step 5 Option A or Option B, Step 6.7 and Step 8.
+5. Do the README "Deployment Steps" in their order. For each step, do steps 6 to 14.
+6. If the README gives manual actions or preconditions for the step, tell me what they are. Wait until I confirm them.
+7. Read the task for the step in Taskfile.yaml. Find each file that the task reads, for example the keys in .keys.
+8. If the task needs keys, run the key-generation tasks from Taskfile.yaml first. If the key directory exists already, ask me before you run the task.
+9. If a file that the task reads is still missing, stop and tell me.
+10. Find each variable in variables.tf that has no default and that the task does not set. Ask me for its value. If the value is an output of an earlier stack, read it with "tofu output" in that stack. Show it to me.
+11. Write the values into terraform.tfvars of the stack.
+12. Run "tofu init" and "tofu plan" in the stack directory. Use the same -var and -exclude arguments and the same TF_VAR_ environment variables as the task. Show me the number of resources to add, change and destroy, and the main resources.
+13. Wait for my explicit "yes". Then run the task. The task runs "tofu apply", which asks for a confirmation. If you cannot answer it, give me the command to run in my terminal. Wait for my result.
+14. If the task runs "tofu apply" two times, do steps 12 and 13 before each apply.
+15. Before README Step 6, make sure that the VPN is connected. Help me configure kubeconfig with the Oracle guide that the README links.
+16. At the end, run these checks through the VPN:
+   - "kubectl get nodes" shows each node as Ready.
+   - "kubectl get sc" shows exactly one class marked (default).
+   - If metrics-server is installed, "kubectl top node" shows data.
+17. Give me a short summary: each stack that you applied, the main resources that it created, the manual actions that remain, and each difference between README.md and Taskfile.yaml.
+```
+
 ## What's Included
 
 Default setup manages the following components:
@@ -38,7 +84,8 @@ This repo is published on GitHub. **No domain names, hostnames, project names, o
 ### OCI Account Requirements
 - Active OCI account with appropriate permissions
 - OCI CLI configured with authentication profile
-- SSH key pair for VPN instance access
+- An OCI session token for the `DEFAULT` profile. Run `task oci:login` before each apply.
+- SSH key pair for the OKE worker nodes (`task oci-platform:generate-ssh-keys`) and the VPN instance
 
 ### OpenTofu Backend Configuration
 Configure [OpenTofu backend](https://opentofu.org/docs/language/settings/backends/configuration/) for each module. See examples in `backend.tf.template`.
@@ -55,6 +102,7 @@ task oci-platform:install-network
 
 ```bash
 task oci-platform:generate-user-keys
+task oci-platform:generate-ci-keys
 task oci-platform:install-identity
 ```
 
