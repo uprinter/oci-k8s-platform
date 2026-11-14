@@ -36,23 +36,33 @@ tasks:
         done
 
   oci-platform:generate-ci-keys:
-    desc: "Step 0. Generate key pair for the ci-terraform technical user"
+    desc: "Step 0. Generate key pair for the ci-terraform technical user (never overwrites)"
     cmds:
-      - echo "Generating key pair for the ci-terraform technical user"
-      - rm -rf ./.keys/ci
-      - mkdir -p ./.keys/ci
-      - openssl genrsa -out .keys/ci/ci-terraform.pem 2048
-      - openssl rsa -pubout -in .keys/ci/ci-terraform.pem -out .keys/ci/ci-terraform_public.pem
-      - echo "Keys generated in .keys/ci/ directory"
+      - |
+        d=.keys/ci
+        if [ -e "$d/ci-terraform.pem" ] || [ -e "$d/ci-terraform_public.pem" ]; then
+          echo "$d already has a key pair: not overwriting it." >&2
+          exit 1
+        fi
+        mkdir -p "$d" && chmod 700 "$d"
+        openssl genrsa -out "$d/ci-terraform.pem" 2048 2>/dev/null
+        chmod 600 "$d/ci-terraform.pem"
+        openssl rsa -pubout -in "$d/ci-terraform.pem" -out "$d/ci-terraform_public.pem" 2>/dev/null
+        echo "Keys generated in $d"
 
   oci-platform:generate-ssh-keys:
-    desc: "Step 0. Generate SSH key pair for OKE worker nodes"
+    desc: "Step 0. Generate SSH key pair for OKE worker nodes (never overwrites)"
     cmds:
-      - echo "Generating SSH key pair for OKE worker nodes"
-      - rm -rf ./.keys/ssh
-      - mkdir -p ./.keys/ssh
-      - ssh-keygen -t ed25519 -f .keys/ssh/id_ed25519 -N '' -C oke-worker
-      - echo "SSH keys generated in .keys/ssh/ directory"
+      - |
+        d=.keys/ssh
+        if [ -e "$d/ssh_private.key" ] || [ -e "$d/ssh_public.key" ]; then
+          echo "$d already has a key pair: not overwriting it." >&2
+          exit 1
+        fi
+        mkdir -p "$d" && chmod 700 "$d"
+        ssh-keygen -t ed25519 -f "$d/ssh_private.key" -N '' -C oke-worker
+        mv "$d/ssh_private.key.pub" "$d/ssh_public.key"
+        echo "SSH keys generated in $d"
 
   oci-platform:install-network:
     desc: "Step 1. Install network layer"
@@ -88,6 +98,10 @@ tasks:
     cmds:
       - echo "Installing OKE..."
       - |
+        if [ ! -s ../.keys/ssh/ssh_public.key ]; then
+          echo "Missing ../.keys/ssh/ssh_public.key: run task oci-platform:generate-ssh-keys." >&2
+          exit 1
+        fi
         SSH_PUBLIC_KEY=$(cat ../.keys/ssh/ssh_public.key)
         tofu init
         tofu apply -var="ssh_public_key=$SSH_PUBLIC_KEY"
