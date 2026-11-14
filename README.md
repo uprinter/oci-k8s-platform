@@ -2,6 +2,10 @@
 
 Kubernetes setup on Oracle Cloud Infrastructure (OCI) using **Always Free** tier resources.
 
+## Why
+
+I wanted to run my side projects in production without paying for a cloud. So I built the platform the way I build them at work: every layer as code, the Kubernetes API reachable only through VPN, TLS and DNS handled by the cluster itself. My personal site and side projects run on it today. An AI agent team maintains it, and every change goes through a reviewed merge request.
+
 ## What's Included
 
 Default setup manages the following components:
