@@ -11,11 +11,6 @@ variable "region" {
 variable "internal_zone_name" {
   description = "Internal DNS zone name"
   type        = string
-}     
-
-variable "external_zone_name" {
-  description = "External DNS zone name"
-  type        = string
 }
 
 variable "public_zone_names" {
